@@ -188,3 +188,21 @@ pheatmap(samp_dist,
 
 <br>
 
+```{r, eval=FALSE, echo=FALSE}
+hclust_ward <- hclust(samp_dist0, method = "ward.D2")
+# plot(hclust_ward,
+#      main = element_blank(),
+#      xlab = element_blank(), sub = element_blank())
+
+pheatmap(as.matrix(samp_dist0),
+         clustering_distance_rows = samp_dist0,
+         clustering_distance_cols = samp_dist0,
+         clustering_method = "ward.D2",
+         color = colorRampPalette(brewer.pal(9, "YlGnBu"))(100),
+         annotation_row = ann_rc,
+         annotation_col = ann_rc,
+         annotation_colors = ann_clrs,
+         cutree_rows = 2, cutree_cols = 2,
+         na_col = NA, border_color = NA,
+         fontsize_row = 8, fontsize_col = 8, fontsize = 8)
+```
