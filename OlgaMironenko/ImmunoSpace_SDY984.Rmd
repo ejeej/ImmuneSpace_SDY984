@@ -12,6 +12,7 @@ output:
     keep_md: true
 editor_options:
   chunk_output_type: console
+# runtime: shiny
 ---
 
 <style type="text/css">
@@ -27,7 +28,9 @@ library(labelled)
 library(gtsummary)
 library(ggbeeswarm)
 library(lemon)
-
+if (identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny")) {
+  library(shiny)
+}
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
 
@@ -56,7 +59,7 @@ df_subj_baseline <- df_subj %>%
             gender = factor(gender), 
             race = fct_infreq(factor(race)),
             ethnicity = factor(ethnicity, c("Not Hispanic or Latino", "Hispanic or Latino")),
-            MFC_baseline = ImmResp_baseline_value_MFC,
+            igg_baseline = ImmResp_baseline_value_MFC,
             response = factor(MFC_p40, c("lowResponder", "highResponder"), 
                               c("Low Responder", "High Responder")))
 
@@ -66,7 +69,7 @@ var_label(df_subj_baseline) <-
        gender = "Gender",
        race = "Race",
        ethnicity = "Ethnicity",
-       MFC_baseline = "MFC",
+       igg_baseline = "log2(IgG), ELISA",
        response = "Vaccination response (MFC_p40)")
 
 # Данные по экспрессии генов для участников исследования SDY984 ----------------
@@ -84,39 +87,51 @@ df_expr <- expr_t %>%
            sep = "_", remove = FALSE, convert = TRUE) %>%
   filter(participant_id %in% df_subj_baseline$participant_id) %>%
   left_join(df_subj %>% 
-              transmute(uid, MFC_postvax = ImmResp_postVax_value_MFC), 
+              transmute(uid, igg_postvax = ImmResp_postVax_value_MFC), 
             by = "uid") %>%
   left_join(df_subj_baseline %>% 
               select(participant_id, arm_accession, gender, race, ethnicity, 
-                     MFC_baseline, response), 
+                     igg_baseline, response), 
             by = "participant_id")
 
   # Уберём гены с одними пропусками по экспрессии
 df_expr <- df_expr %>%
   select(function(x) sum(is.na(x)) != length(x)) %>%
   select(participant_id, uid, arm_accession, gender, race, ethnicity,
-         MFC_baseline, time, response, MFC_postvax, everything())
+         igg_baseline, time, response, igg_postvax, everything())
 
   # Длинный датафрейм
 df_expr_long <- df_expr %>%
   pivot_longer(A1BG:last_col(), names_to = "gene", values_to = "expr")
 ```
 
-В данном отчёте будут представлены результаты анализа данных по экспрессии генов среди добровольцев, прошедших вакцинацию от varicella zoster вакциной Zostavax. Данные были получены в рамках исследования [SDY984](https://www.immport.org/shared/study/SDY984) по программе [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) и выложены на страничке [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (доступны для скачивания после регистрации). 
+## **Общая информация**
 
-Экспрессия генов оценивалась у `r length(unique(df_subj$participant_id))` добровольцев до вакцинации и в нескольких точках (`r paste(timepoints[timepoints>0], collapse = ", ")` дней) после неё. Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался ответ на вакцинацию с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40.
+<br>
 
-**Задача нашего исследовательского проекта** - определить, по экспрессии каких именно генов различались между собой испытуемые с разным уровнем ответа на вакцинацию и в какие сигнальные пути входят эти гены. 
+В данном отчёте будут представлены результаты анализа данных по экспрессии генов среди добровольцев, прошедших **вакцинацию от varicella zoster живой ослабленной вакциной Zostavax**. Данные были получены в рамках исследования [SDY984](https://www.immport.org/shared/study/SDY984) по программе [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) и выложены на страничке [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (доступны для скачивания после регистрации).
+
+**Задача нашего исследовательского проекта** - определить, динамика экспрессии каких именно генов связана с иммунным ответом на вакцинацию и в какие сигнальные пути входят эти гены. Эту задачу можно решать двояко: 
+
+- с помощью оценки различий в экспрессии генов между испытуемыми, ответившими и не ответившими на вакцинацию, 
+
+- с помощью оценки взаимосвязи между экспрессией генов (и её динамикой) и итоговым ответом на вакцинацию.
+
+<br>
+
+В выбранном нами исследовании **экспрессия генов** оценивалась у `r length(unique(df_subj$participant_id))` добровольцев до вакцинации и в нескольких точках (`r paste(timepoints[timepoints>0], collapse = ", ")` дней) после неё. 
+
+Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался **ответ на вакцинацию** с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40. MFC - это maximum fold change (максимальная кратность изменения) для титра антител после вакцинации по сравнению с состоянием до неё (максимальная - поскольку [некоторые вакцины в исследовании содержали несколько штаммов вируса и/или титр антител для них определялся с помощью нескольких тестов](https://www.nature.com/articles/s41590-022-01329-5)). В исследовании, с данными которого мы будем работать, штамм был один и титр антител измерялся с помощью одной методики - оценка уровня IgG методом ELISA (enzyme-linked immunosorbent assay, или иммуноферментный анализ, ИФА), поэтому в данном случае MFC фактически равна просто кратности изменения титра антител (формально это $log_2(FC)$). Что касается разбивки на группы по ответу, то оно оно [производилось по перцентилям полученного значения для MFC](https://www.nature.com/articles/s41590-022-01329-5), а именно: для MFC_p40 все испытуемые, у кого MFC был меньше или равен 40-му перцентилю, считались low responder'ами, с MFC, равным или большим 60-го перцентиля - high responder'ами, остальные - moderate responder'ами (детали можно найти, в том числе, в [функциях](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R), которые использовались для получения того датасета, с которым мы работаем).
 
 В целях упрощения в рамках нашего исследовательского проекта мы исключим из анализа испытуемых с moderate ответом на вакцинацию (`r sum(df_subj$MFC_p40 == "moderateResponder" & df_subj$study_time_collected == 0)` чел.), а также, на начальном этапе, не будем делать разбивку в зависимости от ветви исследования (возрастной группы испытуемых).
 
 <br>
 
-## **Описательная статистика, baseline**
+## **Описательная статистика: характеристики испытуемых, baseline**
 
 <br>
 
-Описательная статистика по участникам исследования на начало исследования (до вакцинации) представлена в Table 1 ниже. Поскольку мы планируем в своём исследовании сравнивать испытуемых с разным уровнем ответа по экспрессии генов, данные в таблице представлены в разбивке по этим группам. Young - добровольцы в возрасте 25 лет, Elderly - добровольцы в возрасте 60 лет.
+Описательная статистика по участникам исследования на начало исследования (до вакцинации) представлена в Table 1 ниже. Поскольку мы планируем в своём исследовании, в том числе, сравнивать испытуемых с разным уровнем ответа по экспрессии генов, данные в таблице представлены в разбивке по этим группам. Young - добровольцы в возрасте 25 лет, Elderly - добровольцы в возрасте 60 лет.
 
 ```{r table1}
 tbl_summary(
@@ -126,7 +141,7 @@ tbl_summary(
   statistic = list(
     all_continuous() ~ c("{mean} ({sd})", 
                          "{median} ({p25}-{p75})", "{min}-{max}")),
-  digits = list(MFC_baseline ~ rep(1,7)),
+  digits = list(igg_baseline ~ rep(1,7)),
   missing_text = "Н.Д.") %>%
   add_stat_label(label = list(
     all_continuous() ~ c("Mean (SD)",
@@ -134,7 +149,7 @@ tbl_summary(
   add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3)) %>%
   modify_header(all_stat_cols() ~ "**{level}**<br>N = {n}") %>%
   modify_footnote(p.value ~ "p-value: Study arm, Gender, Race - Pearson's Chi-squared test;<br> 
-                  Ethnicity - Fisher's exact test; MFC - Mann-Whitney test") %>%
+                  Ethnicity - Fisher's exact test; IgG - Mann-Whitney test") %>%
   bold_labels() %>%
   as_kable_extra(caption = "<b>Table 1. Baseline characteristics of the study participants.</b>",
                  addtl_fmt = FALSE) %>% 
@@ -145,7 +160,7 @@ tbl_summary(
 
 <br>
 
-## **Сравнение экспрессии генов между группами испытуемых с разным уровнем ответа на вакцинацию**
+## **Описательная статистика: экспрессии генов**
 
 <br>
 
@@ -159,22 +174,111 @@ genes_maxvar <- df_expr_long %>%
   slice_head(n = 5000)
 
 df_expr_long_fin <- df_expr_long %>%
-  filter(gene %in% genes_maxvar$gene)
+  filter(gene %in% genes_maxvar$gene) %>%
+  mutate(timeF = factor(time, timepoints, ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
 ```
+
+<br>
+
+Ниже представлены диаграммы экспрессий во всех точках исследования для 10 генов, случайно выбранных из оставшихся 5 тысяч. 
+
+_Если вы запускаете этот отчёт в R и активизируете в yaml опцию `runtime: shiny`, то сможете генерировать случайные выборки по 10 генов по нажатию кнопки New sample и видеть соответствующие графики_
+
+```{r shiny_hists, eval=identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny")}
+# Мини-приложение для генерации случайной выборки из 10 генов и отрисовки по ним гистограмм
+# запускается через Rmarkdown c опцией runtime: shiny в yaml
+
+shinyApp(
+  ui = fluidPage(
+    actionButton("samp", "New sample"),
+    p(""),
+    plotOutput("plot_sample")
+  ),
+  server = function(input, output) {
+    
+    rvalues <- reactiveValues(new_plot = 1)
+    replot <- observeEvent(input$samp, {
+      rvalues$new_plot <- rvalues$new_plot + 1
+    })
+    
+    output$plot_sample <- renderPlot({
+      req(rvalues$new_plot)
+      df_expr_long_fin %>% 
+        filter(gene %in% sample(genes_maxvar$gene, size = 10, replace = FALSE)) %>%
+        mutate(gene = fct_reorder(gene, expr, max)) %>% 
+        ggplot(aes(x = expr, fill = response)) +
+        geom_histogram(alpha = 0.6, position = "identity") +
+        scale_y_continuous(expand = c(0,0,0.1,0)) +
+        scale_fill_manual(values = c("#E15759", "#4E79A7")) +
+        facet_grid(gene ~ timeF, scales = "free_x", switch = "y") +
+        labs(x = "Gene expression", y = element_blank(), fill = element_blank(),
+             title = "Figure 1. Distribution of the random 20 genes expressions by time",
+             caption = "Counts on the Y-axis (the same scale for all plots)") +
+        theme_bw(base_size = 12) +
+        theme(legend.position = "bottom",
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              strip.background = element_blank(),
+              strip.placement = "outside",
+              strip.text.y.left = element_text(size = 10, color = "black", face = "bold", angle = 0, hjust = 1),
+              strip.text.x = element_text(size = 11, color = "black", face = "bold"),
+              plot.title = element_text(size = 13, face = "bold"),
+              plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+    }, width = 600, height = 650)
+  }, options = list(height = 700, width = 650))
+```
+
+```{r fig1_hists, eval=!identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny"), echo=!identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny"), fig.width=8, fig.height=8}
+# Гистограммы для экспрессий для случайной выборки из 10 генов
+# (для html отчёта)
+
+df_expr_long_fin %>% 
+  filter(gene %in% sample(genes_maxvar$gene, size = 10, replace = FALSE)) %>%
+  mutate(gene = fct_reorder(gene, expr, max)) %>% 
+  ggplot(aes(x = expr, fill = response)) +
+  geom_histogram(alpha = 0.6, position = "identity") +
+  scale_y_continuous(expand = c(0,0,0.1,0)) +
+  scale_x_continuous(breaks = seq(0, max(df_expr_long_fin$expr), 2)) +
+  scale_fill_manual(values = c("#E15759", "#4E79A7")) +
+  facet_grid(gene ~ timeF, scales = "free", switch = "y") +
+  labs(x = "Gene expression", y = element_blank(), fill = element_blank(),
+       title = "Figure 1. Distribution of the random 20 genes expressions by time",
+       caption = "Counts on the Y-axis (the same scale for all plots)") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text.y.left = element_text(size = 10, color = "black", face = "bold", angle = 0, hjust = 1),
+        strip.text.x = element_text(size = 11, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+<br>
+
+## **Сравнение экспрессии генов между группами испытуемых с разным уровнем ответа: попарные тесты Манна-Уитни**
+
+<br>
 
 В каждой точке исследования по каждому гену сравним экспрессии генов между группами со слабым и сильным ответом на вакцинацию с помощью теста Манна-Уитни, скорректируем полученные p-values по методу Бенджамини-Хохберга (для контроля FDR, в каждой точке отдельно) и посмотрим, по какому количеству генов средние значения экспрессий различаются на уровне значимости 5% без коррекции и с коррекцией.
 
 ```{r table2_mwtest}
-mwtest_p <- df_expr_long_fin %>%
-  group_by(time, gene) %>%
-  summarise(p = wilcox.test(expr ~ response)$p.value) %>%
-  group_by(time) %>%
-  mutate(p_adj = p.adjust(p, method = "BH")) %>%
-  ungroup() %>%
-  arrange(p_adj) %>%
-  mutate(p_group = cut(p, c(0, 0.05, 1.1), c("< 0.05", "$\\geq$ 0.05"), right = FALSE),
-         p_adj_group = cut(p_adj, c(0, 0.05, 1.1), c("< 0.05", "$\\geq$ 0.05"), right = FALSE),
-         timeF = factor(time, timepoints, ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
+mwtest_p <- suppressWarnings({df_expr_long_fin %>%
+    group_by(time, timeF, gene) %>%
+    summarise(p = wilcox.test(expr ~ response)$p.value) %>%
+    group_by(time) %>%
+    mutate(p_adj = p.adjust(p, method = "BH")) %>%
+    ungroup() %>%
+    arrange(p_adj) %>%
+    mutate(p_group = cut(p, c(0, 0.05, 1.1), c("< 0.05", "$\\geq$ 0.05"), right = FALSE),
+           p_adj_group = cut(p_adj, c(0, 0.05, 1.1), c("< 0.05", "$\\geq$ 0.05"), right = FALSE))
+})
 
 tbl_summary(
   mwtest_p %>% select(timeF, p_group, p_adj_group), 
@@ -237,17 +341,15 @@ tbl_merge(tbl_data$tbl, tab_spanner = sprintf("<b>%s</b>", levels(mwtest_p$timeF
 
 В качестве иллюстрации:
 
-```{r fig1_geneexpr, fig.width=6.1, fig.height=5}
-ggplot(df_expr_long_fin %>% 
-         filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05]) %>%
-         mutate(timeF = factor(time, timepoints, ifelse(timepoints == 0, "Baseline", paste(timepoints, "d.")))),
+```{r fig2_geneexpr, fig.width=6.1, fig.height=5}
+ggplot(df_expr_long_fin %>% filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05]),
        aes(x = timeF, y = expr, color = response)) +
   geom_boxplot(position = position_dodge(0.8), width = 0.6) +
   geom_beeswarm(dodge.width = 0.8, groupOnX = TRUE, size = 1.5, alpha = 0.5) +
   scale_color_manual(values = c("#E15759", "#4E79A7")) +
   facet_rep_wrap(~ gene, repeat.tick.labels = TRUE) +
   labs(x = element_blank(), y = "Gene expression", color = element_blank(),
-       title = "Figure 1. Expressions by time and response status",
+       title = "Figure 2. Expressions by time and response status",
        subtitle = "Genes with significantly different expressions (at least at one point)",
        caption = "Elements of the boxplots:
        bold line inside the box is a median value (Q2), 
