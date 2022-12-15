@@ -28,6 +28,10 @@ library(labelled)
 library(gtsummary)
 library(ggbeeswarm)
 library(lemon)
+library(lme4)
+library(lmerTest)
+library(marginaleffects)
+library(broom.mixed)
 if (identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny")) {
   library(shiny)
 }
@@ -121,7 +125,7 @@ df_expr_long <- df_expr %>%
 
 В выбранном нами исследовании **экспрессия генов** оценивалась у `r length(unique(df_subj$participant_id))` добровольцев до вакцинации и в нескольких точках (`r paste(timepoints[timepoints>0], collapse = ", ")` дней) после неё. 
 
-Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался **ответ на вакцинацию** с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40. MFC - это maximum fold change (максимальная кратность изменения) для титра антител после вакцинации по сравнению с состоянием до неё (максимальная - поскольку [некоторые вакцины в исследовании содержали несколько штаммов вируса и/или титр антител для них определялся с помощью нескольких тестов](https://www.nature.com/articles/s41590-022-01329-5)). В исследовании, с данными которого мы будем работать, штамм был один и титр антител измерялся с помощью одной методики - оценка уровня IgG методом ELISA (enzyme-linked immunosorbent assay, или иммуноферментный анализ, ИФА), поэтому в данном случае MFC фактически равна просто кратности изменения титра антител (формально это $log_2(FC)$). Что касается разбивки на группы по ответу, то оно оно [производилось по перцентилям полученного значения для MFC](https://www.nature.com/articles/s41590-022-01329-5), а именно: для MFC_p40 все испытуемые, у кого MFC был меньше или равен 40-му перцентилю, считались low responder'ами, с MFC, равным или большим 60-го перцентиля - high responder'ами, остальные - moderate responder'ами (детали можно найти, в том числе, в [функциях](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R), которые использовались для получения того датасета, с которым мы работаем).
+Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался **ответ на вакцинацию** с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40. MFC - это maximum fold change (максимальная кратность изменения) для титра антител после вакцинации по сравнению с состоянием до неё (максимальная - поскольку [некоторые вакцины в исследовании содержали несколько штаммов вируса и/или титр антител для них определялся с помощью нескольких тестов](https://www.nature.com/articles/s41590-022-01329-5)). В исследовании, с данными которого мы будем работать, штамм был один и титр антител измерялся с помощью одной методики - оценки уровня IgG методом ELISA (enzyme-linked immunosorbent assay, или иммуноферментный анализ, ИФА), поэтому в данном случае MFC фактически равна просто кратности изменения титра антител (формально это $log_2(FC)$). Что касается разбивки на группы по ответу, то оно [производилось по перцентилям полученного значения для MFC](https://www.nature.com/articles/s41590-022-01329-5), а именно: для MFC_p40 все испытуемые, у кого MFC был меньше или равен 40-му перцентилю, считались low responder'ами, с MFC, равным или большим 60-го перцентиля - high responder'ами, остальные - moderate responder'ами (детали можно найти, в том числе, в [функциях](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R), которые использовались для получения того датасета, с которым мы работаем).
 
 В целях упрощения в рамках нашего исследовательского проекта мы исключим из анализа испытуемых с moderate ответом на вакцинацию (`r sum(df_subj$MFC_p40 == "moderateResponder" & df_subj$study_time_collected == 0)` чел.), а также, на начальном этапе, не будем делать разбивку в зависимости от ветви исследования (возрастной группы испытуемых).
 
@@ -180,9 +184,9 @@ df_expr_long_fin <- df_expr_long %>%
 
 <br>
 
-Ниже представлены диаграммы экспрессий во всех точках исследования для 10 генов, случайно выбранных из оставшихся 5 тысяч. 
+Ниже представлены гистограммы для экспрессий во всех точках исследования для 10 генов, случайно выбранных из оставшихся 5 тысяч. 
 
-_Если вы запускаете этот отчёт в R и активизируете в yaml опцию `runtime: shiny`, то сможете генерировать случайные выборки по 10 генов по нажатию кнопки New sample и видеть соответствующие графики_
+_Если вы запускаете этот отчёт в RStudio и активизируете в опциях .rmd-файла (yaml) опцию `runtime: shiny`, то сможете генерировать случайные выборки по 10 генов по нажатию кнопки New sample и видеть соответствующие графики_
 
 ```{r shiny_hists, eval=identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny")}
 # Мини-приложение для генерации случайной выборки из 10 генов и отрисовки по ним гистограмм
@@ -212,7 +216,7 @@ shinyApp(
         scale_fill_manual(values = c("#E15759", "#4E79A7")) +
         facet_grid(gene ~ timeF, scales = "free_x", switch = "y") +
         labs(x = "Gene expression", y = element_blank(), fill = element_blank(),
-             title = "Figure 1. Distribution of the random 20 genes expressions by time",
+             title = "Figure 1. Distribution of the random 10 genes expressions by time",
              caption = "Counts on the Y-axis (the same scale for all plots)") +
         theme_bw(base_size = 12) +
         theme(legend.position = "bottom",
@@ -244,7 +248,7 @@ df_expr_long_fin %>%
   scale_fill_manual(values = c("#E15759", "#4E79A7")) +
   facet_grid(gene ~ timeF, scales = "free", switch = "y") +
   labs(x = "Gene expression", y = element_blank(), fill = element_blank(),
-       title = "Figure 1. Distribution of the random 20 genes expressions by time",
+       title = "Figure 1. Distribution of the random 10 genes expressions by time",
        caption = "Counts on the Y-axis (the same scale for all plots)") +
   theme_bw(base_size = 12) +
   theme(legend.position = "bottom",
@@ -373,3 +377,308 @@ ggplot(df_expr_long_fin %>% filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05
 [**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2) - это белок, который регулирует активность лейкоцитов, отвечающих за иммунитет. 
 
 [**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов.
+
+<br>
+
+## **Сравнение экспрессии генов между группами испытуемых с разным уровнем ответа: линейная смешанная модель**
+
+<br>
+
+```{r ranks}
+# Функция для нахождения квантилей по эмпирической функции распределения --> 
+# ранги
+rank_quant <- function(x) {
+  ecdf_x <- ecdf(x)
+  ecdf_inv <- function(v) {quantile(x, v)}
+  qq <- ecdf_inv(ecdf_x(x))
+  qq <- names(qq) %>% gsub("%", "", .) %>% as.numeric(.)/100
+  qq
+}
+
+# "Квантильные" ранги для экспрессий генов для каждого испытуемого в каждой точке
+df_expr_long_fin <- df_expr_long_fin %>%
+  group_by(participant_id, time) %>%
+  mutate(expr_rank = rank_quant(expr)) %>%
+  ungroup()
+```
+
+### **Описание модели**
+
+<br>
+
+Для каждого гена из ранее отобранных 5 тыс. оценим линейные смешанные модели (linear mixed effects model) вида:
+
+1. $expr_{it} = \beta_0 + \beta_{0i} + \beta_1*time_{j} + \beta_2*response_{i} + \epsilon_{ij}$, где:
+
+- $expr_{ij}$ - экспрессия гена для _i_-го испытуемого в точке исследования _j_; оценим отдельно спецификации с:
+
+  - исходными данными по экспрессии, 
+  
+  - рангами генов по экспрессии, рассчитанными для каждого испытуемого в каждой точке исследования как квантиль эмпрической функции распределения экспрессий по всем генам для этого испытуемого в этой точке, 
+
+- $time_j$ - точка исследования (в днях от вакцинации), 
+
+- $response_i$ - ответ на вакцинацию _i_-го испытумого (1 - high responder, 0 - low responder), 
+
+- $\beta_0$ - константа регрессионного уравнения (глобальное среднее значение экспрессии гена по всем испытуемым во всех точках),
+
+- $\beta_{0i}$ - случайный эффект (моделируется для каждого испытуемого, имеет нормальное распределение со средним 0 и дисперсией, которая характеризует вариацию средней экспрессии гена между испытуемыми вокруг глоабального среднего значения),
+
+- $\beta_{1,2}$ - коэффициенты регрессионного уравнения (фиксированные эффекты времени от вакцинации и ответа на неё), 
+
+- $\epsilon_{ij}$ - случайный остаток регрессионного уравнения (предполагается, что имеет нормальное распределение со средним значением 0 и дисперсией, которая характеризует вариацию экспрессии для каждого испытуемого (во времени)).
+
+    Оценка коэффициента $\beta_2$ данного регрессионного уравнения может интерпретироваться как **средний предельный эффект (average marginal/ treatment effect, AME/ ATE)** ответа на вакцинацию в отношении экспрессии, т.е. в нашем случае она покажет, на сколько отличается среднее значение экспрессии гена среди high респондеров по сравнению с low респондерами по всем точкам исследования.
+
+<br>
+
+2. $expr_{it} = \beta_0 + \beta_{0i} + \beta_1*time_{j} + \beta_2*response_{i} + \beta_3*time_j * response_i + \epsilon_{ij}$, где по сравнению с предыдущей спецификацией добавляется $time_j * response_i$ - пересечение времени анализа и статуса по ответу на вакцинацию.
+
+    При оценке этой модели предполагается, что эффект ответа на вацинацию может меняться во времени (и, аналогично, динамика экспрессии может быть разной в зависимости от ответа на вакцинацию). Оценка коэффициента $\beta_2$ в этой модели может быть интерпретирована как ATE в точке baseline (когда $time=0$), т.е. как baseline разница в средней экспрессии гена между теми, кто в дальнейшем был отнесен к high респондерам, и теми, кто нет. Для остальных временных точек ATE может быть получен из соотношения $\beta_2 + \beta_3*time$. Соответственно оценку коэффициента $\beta_3$ мы можем интерпретировать как изменение ATE ответа при увеличении времени от вакцинации на 1 день.
+    
+<br>
+
+Оценка линейных смешанных моделей будет выполнена с помощью функции `lmer` из пакета `lme4`, а оценка средних предельных эффектов - с помощью функции `marginaleffects` из одноименного пакета. Заметим, что если в `marginaleffects` после модели с эффектами пересечения задать конкретные временные точки (например, $time=$ `r paste(timepoints, collapse = ",")`), то для переменной $response$ мы получим искомые значения ATE в этих точках ($\beta_2 + \beta_3*time$) вместе с их p-values, а если этого не сделать, то на выходе для переменной $response$ мы получим оценку ATE, равную оценке коэффициента $\beta_2$ из модели без эффекта пересечения.
+
+
+```{r mixedmodels, eval=FALSE}
+# Оценка динейных смешанных моделей
+lmer_fits <- suppressMessages({df_expr_long_fin %>%
+    nest_by(gene) %>%
+    mutate(
+      fit_noint = list(lmer(expr ~ time + response + (1|participant_id), data)),
+      fit_int = list(lmer(expr ~ time*response + (1|participant_id), data)),
+      fit_nointrank = list(lmer(expr_rank ~ time + response + (1|participant_id), data)),
+      fit_intrank = list(lmer(expr_rank ~ time*response + (1|participant_id), data))
+    )
+})
+
+# P-values для beta2 и beta3 из моделей с пересечением
+
+lmer_p_int <- lmer_fits %>%
+  select(gene, fit_int) %>%
+  mutate(res_int = list(
+    fit_int %>% tidy() %>% filter(grepl("response", term)) %>%
+      transmute(term = ifelse(str_starts(term, "response"), "b2", "b3"), p = p.value))) %>%
+  select(-fit_int) %>%
+  unnest(res_int)
+
+lmer_p_intrank <- lmer_fits %>%
+  select(gene, fit_intrank) %>%
+  mutate(res_int = list(
+    fit_intrank %>% tidy() %>% filter(grepl("response", term)) %>%
+      transmute(term = ifelse(str_starts(term, "response"), "b2", "b3"), p = p.value))) %>%
+  select(-fit_intrank) %>%
+  unnest(res_int)
+
+# Average marginal/ treatment effects
+
+lmer_ame_int <- lmer_fits %>%
+  select(gene, fit_int) %>%
+  mutate(res_int = list(
+    fit_int %>%
+      marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001) %>%
+      filter((term == "time" & time == 0) | (term == "response" & response == "Low Responder")) %>%
+      transmute(time, response, term_int = term, est_int = dydx, se_int = std.error,
+                p_int = p.value, cil_int = conf.low, ciu_int = conf.high))) %>%
+  select(-fit_int) %>%
+  unnest(res_int)
+
+lmer_ame_intrank <- lmer_fits %>%
+  select(gene, fit_intrank) %>%
+  mutate(res_int = list(
+    fit_intrank %>%
+      marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001) %>%
+      filter((term == "time" & time == 0) | (term == "response" & response == "Low Responder")) %>%
+      transmute(time, response, term_int = term, est_int = dydx, se_int = std.error,
+                p_int = p.value, cil_int = conf.low, ciu_int = conf.high))) %>%
+  select(-fit_intrank) %>%
+  unnest(res_int)
+
+lmer_ame_noint <- lmer_fits %>%
+  select(gene, fit_noint) %>%
+  mutate(res_noint = list(
+    fit_noint %>% marginaleffects() %>% tidy() %>%
+      transmute(term_noint = term, est_noint = estimate, se_noint = std.error, p_noint = p.value, cil_noint = conf.low, ciu_noint = conf.high))) %>%
+  select(-fit_noint) %>%
+  unnest(res_noint)
+
+lmer_ame_nointrank <- lmer_fits %>%
+  select(gene, fit_nointrank) %>%
+  mutate(res_noint = list(
+    fit_nointrank %>% marginaleffects() %>% tidy() %>%
+      transmute(term_noint = term, est_noint = estimate, se_noint = std.error, p_noint = p.value, cil_noint = conf.low, ciu_noint = conf.high))) %>%
+  select(-fit_nointrank) %>%
+  unnest(res_noint)
+
+# Сохраним результаты в rds, чтобы при формировании отчёта не ждать оценки регрессий
+saveRDS(lmer_p_int, "OlgaMironenko/res/lmer_p_int.rds")
+saveRDS(lmer_p_intrank, "OlgaMironenko/res/lmer_p_intrank.rds")
+saveRDS(lmer_ame_int, "OlgaMironenko/res/lmer_ame_int.rds")
+saveRDS(lmer_ame_noint, "OlgaMironenko/res/lmer_ame_noint.rds")
+saveRDS(lmer_ame_intrank, "OlgaMironenko/res/lmer_ame_intrank.rds")
+saveRDS(lmer_ame_nointrank, "OlgaMironenko/res/lmer_ame_nointrank.rds")
+```
+
+```{r loadres, echo=FALSE}
+# lmer_p_int <- readRDS("OlgaMironenko/res/lmer_p_int.rds")
+# lmer_p_intrank <- readRDS("OlgaMironenko/res/lmer_p_intrank.rds")
+# lmer_ame_int <- readRDS("OlgaMironenko/res/lmer_ame_int.rds")
+# lmer_ame_noint <- readRDS("OlgaMironenko/res/lmer_ame_moint.rds")
+# lmer_ame_intrank <- readRDS("OlgaMironenko/res/lmer_ame_intrank.rds")
+# lmer_ame_nointrank <- readRDS("OlgaMironenko/res/lmer_ame_nointrank.rds")
+lmer_p_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_p_int.rds"))
+lmer_p_intrank <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_p_intrank.rds"))
+lmer_ame_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ame_int.rds"))
+lmer_ame_noint <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ame_noint.rds"))
+lmer_ame_intrank <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ame_intrank.rds"))
+lmer_ame_nointrank <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ame_nointrank.rds"))
+```
+
+<br>
+
+### **Результаты оценки**
+
+<br>
+
+Начнем с того, что посмотрим, **является ли эффект пересечения ответа и времени статистически значимым** в моделях с первичными оценками экспрессий и их рангами, т.е. меняется ли значимым образом разница между испытуемыми с разным уровнем ответа во времени. Для этого изобразим диаграммы рассеяния для каждой спецификации, где покажем значения p-value: по оси X - для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values.
+
+```{r fig3_p12, fig.width=8, fig.height=5}
+lmer_p_int_plt <- bind_rows(
+  lmer_p_int %>%
+    mutate(model = "Expression as is"),
+  lmer_p_intrank %>%
+    mutate(model = "Rank by expression")) %>%
+  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression"))) %>%
+  pivot_wider(id_cols = c("gene", "model"), names_from = "term", values_from = "p")
+
+critv <- -log10(0.05)
+
+genes_int_both5_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
+                                              lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 > critv]
+genes_int_both5_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
+                                              lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 > critv]
+genes_int_b25_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
+                                            lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 <= critv]
+genes_int_b35_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
+                                            lmer_p_int_plt$b2 <= critv & lmer_p_int_plt$b3 > critv]
+genes_int_b25_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
+                                            lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 <= critv]
+genes_int_b35_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
+                                            lmer_p_int_plt$b2 <= critv & lmer_p_int_plt$b3 > critv]
+
+ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
+  geom_point(color = "#499894", alpha = 0.5) +
+  geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
+  geom_vline(aes(xintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
+  geom_vline(aes(xintercept = critv), linewidth = 0.7, color = "red") +
+  scale_x_continuous(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.02, 0)) +
+  facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
+  labs(x = bquote(-log[10](p)~", response"), y = bquote(-log[10](p)~", response*time"), 
+       title = "Figure 3. P-values for regression coefficients estimates",
+       subtitle = "Linear mixed models with the interaction term",
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
+       The higher the axis value, the lower is the p-value.") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        # axis.line = element_blank(),
+        panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor = element_line(linewidth = .1, color = '#ebebebFF'),
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 12, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+Всего получается `r length(genes_int_both5_init)` гена в модели с исходными значениями для экспрессии и `r length(genes_int_both5_rank)` генов в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов на момент baseline, но и по его динамике. При этом эти списки пересекаются по `r length(intersect(genes_int_both5_init, genes_int_both5_rank))` генам: `r paste(intersect(genes_int_both5_init, genes_int_both5_rank), collapse = ", ")`.
+
+Ещё для `r length(genes_int_b25_init)` (`r length(genes_int_b25_rank)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах.
+
+Ещё для `r length(genes_int_b35_init)` (`r length(genes_int_b35_rank)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+
+<br>
+
+Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. Для этого мы воспользуемся результатами оценки регрессий без эффектов пересечения и построим  volcano plot для пар из $-log_{10}$-преобразования p-value и соответствующей оценки коэффициента при переменной для ответа. 
+
+```{r fig4_volcano, fig.width=6, fig.height=5}
+lmer_v_noint_plt <- bind_rows(
+  lmer_ame_noint %>%
+    filter(term_noint == "response") %>%
+    transmute(gene, est = est_noint, p = p_noint, model = "Expression as is"),
+  lmer_ame_nointrank %>%
+    filter(term_noint == "response") %>%
+    transmute(gene, est = est_noint, p = p_noint, model = "Rank by expression")) %>%
+  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression")))
+
+genes_noint_b25_init <- lmer_v_noint_plt$gene[lmer_v_noint_plt$model == levels(lmer_p_int_plt$model)[1] &
+                                                lmer_v_noint_plt$p > critv]
+genes_noint_b25_rank <- lmer_v_noint_plt$gene[lmer_v_noint_plt$model == levels(lmer_p_int_plt$model)[2] &
+                                                lmer_v_noint_plt$p > critv]
+
+ggplot(lmer_v_noint_plt, aes(x = est, y = p)) +
+  geom_point(color = "#499894", alpha = 0.5) +
+  geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
+  scale_x_continuous(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.01, 0)) +
+  facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
+  labs(x = bquote("ATE for response" ~ (hat(beta[2]))), y = bquote(-log[10](p[hat(beta[2])])), 
+       title = "Figure 4. P-values vs. effect sizes for response",
+       subtitle = "Linear mixed models without the interaction term",
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
+       The higher the Y axis value, the lower is the p-value.") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor = element_line(linewidth = .1, color = '#ebebebFF'),
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 12, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+<br>
+
+Наконец, можно изобразить графики, аналогичные приведённым выше, но для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, полученных по результатам для регрессий с эффектами пересечения. 
+
+```{r fig5_volcano_time, fig.width=6, fig.height=12}
+lmer_v_int_plt <- bind_rows(
+  lmer_ame_int %>%
+    filter(term_int == "response") %>%
+    transmute(gene, time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
+              est = est_int, p = p_int, model = "Expression as is"),
+  lmer_ame_intrank %>%
+    filter(term_int == "response") %>%
+    transmute(gene, time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
+              est = est_int, p = p_int, model = "Rank by expression")) %>%
+  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression")))
+
+ggplot(lmer_v_int_plt, aes(x = est, y = p)) +
+  geom_point(color = "#499894", alpha = 0.5) +
+  geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
+  scale_x_continuous(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.02, 0)) +
+  facet_rep_grid(time ~ model, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
+  labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
+       title = "Figure 5. P-values vs. effect sizes for response",
+       subtitle = "Average marginal effects after linear mixed models with the interaction term",
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
+       The higher the Y axis value, the lower is the p-value.") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor = element_line(linewidth = .1, color = '#ebebebFF'),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 12, color = "black", face = "bold"),
+        strip.placement = "outside",
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+<br>
