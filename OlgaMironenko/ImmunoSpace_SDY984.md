@@ -2,7 +2,7 @@
 title: '**ImmuneSpace: study SDY984**'
 subtitle: '**Genes expression under varicella zoster vaccine**'
 author: "Мироненко Ольга"
-date: "2022-12-15"
+date: "2022-12-16"
 output:
   html_document:
     code_folding: hide
@@ -28,6 +28,7 @@ library(tidyverse)
 library(labelled)
 library(gtsummary)
 library(ggbeeswarm)
+library(ggrepel)
 library(lemon)
 library(lme4)
 library(lmerTest)
@@ -788,83 +789,80 @@ df_expr_long_fin <- df_expr_long_fin %>%
 
 ```r
 # Оценка динейных смешанных моделей
-lmer_fits <- suppressMessages({df_expr_long_fin %>%
-    nest_by(gene) %>%
-    mutate(
-      fit_noint = list(lmer(expr ~ time + response + (1|participant_id), data)),
-      fit_int = list(lmer(expr ~ time*response + (1|participant_id), data)),
-      fit_nointrank = list(lmer(expr_rank ~ time + response + (1|participant_id), data)),
-      fit_intrank = list(lmer(expr_rank ~ time*response + (1|participant_id), data))
-    )
-})
+lmer_q <- purrr::quietly(.f = lmer)
+
+lmer_fits <- df_expr_long_fin %>%
+  nest(-gene) %>%
+  mutate(
+    fit_noint = map(data, ~ lmer_q(expr ~ time + response + (1|participant_id), .x)),
+    fit_int = map(data, ~ lmer_q(expr ~ time*response + (1|participant_id), .x)),
+    fit_nointrank = map(data, ~ lmer_q(expr_rank ~ time + response + (1|participant_id), .x)),
+    fit_intrank = map(data, ~ lmer_q(expr_rank ~ time*response + (1|participant_id), .x)))
 
 # P-values для beta2 и beta3 из моделей с пересечением
 
-lmer_p_int <- lmer_fits %>%
-  select(gene, fit_int) %>%
-  mutate(res_int = list(
-    fit_int %>% tidy() %>% filter(grepl("response", term)) %>%
-      transmute(term = ifelse(str_starts(term, "response"), "b2", "b3"), p = p.value))) %>%
-  select(-fit_int) %>%
-  unnest(res_int)
+lmer_res <- lmer_fits %>%
+  mutate(
+    beta_p_noint = map(fit_noint, ~ .x$result %>% broom.mixed::tidy()),
+    beta_p_nointrank = map(fit_nointrank, ~ .x$result %>% broom.mixed::tidy()),
+    beta_p_int = map(fit_int, ~ .x$result %>% broom.mixed::tidy()),
+    beta_p_intrank = map(fit_intrank, ~ .x$result %>% broom.mixed::tidy()),
+    ame_int = map(
+      fit_int, ~ .x$result %>% 
+        marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001)),
+    ame_intrank = map(
+      fit_intrank, ~ .x$result %>% 
+        marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001))) %>%
+  select(-data, -contains("fit"))
 
-lmer_p_intrank <- lmer_fits %>%
-  select(gene, fit_intrank) %>%
-  mutate(res_int = list(
-    fit_intrank %>% tidy() %>% filter(grepl("response", term)) %>%
-      transmute(term = ifelse(str_starts(term, "response"), "b2", "b3"), p = p.value))) %>%
-  select(-fit_intrank) %>%
-  unnest(res_int)
+# # Сохраним результаты в rds (без отправки на github, т.к. файл большой)
+# # saveRDS(lmer_res, "OlgaMironenko/res/lmer_res.rds")
+# # lmer_res <- readRDS("OlgaMironenko/res/lmer_res.rds")
+# # lmer_res <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_res.rds"))
 
-# Average marginal/ treatment effects
+# Betas and p-values для моделей с пересечением
 
-lmer_ame_int <- lmer_fits %>%
-  select(gene, fit_int) %>%
-  mutate(res_int = list(
-    fit_int %>%
-      marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001) %>%
-      filter((term == "time" & time == 0) | (term == "response" & response == "Low Responder")) %>%
-      transmute(time, response, term_int = term, est_int = dydx, se_int = std.error,
-                p_int = p.value, cil_int = conf.low, ciu_int = conf.high))) %>%
-  select(-fit_int) %>%
-  unnest(res_int)
+lmer_betas_ps_int <- full_join(
+  lmer_res %>%
+    select(gene, beta_p_int) %>%
+    unnest(beta_p_int) %>%
+    select(gene, term, estimate, std.error, p.value),
+  lmer_res %>%
+    select(gene, beta_p_intrank) %>%
+    unnest(beta_p_intrank) %>%
+    select(gene, term, estimate, std.error, p.value),
+  by = c("gene", "term"), suffix = c("_init", "_rank"))
+  
+# AMEs/ATEs and p-values для моделей с пересечением
 
-lmer_ame_intrank <- lmer_fits %>%
-  select(gene, fit_intrank) %>%
-  mutate(res_int = list(
-    fit_intrank %>%
-      marginaleffects(newdata = datagrid(time = timepoints, response = levels(df_subj_baseline$response)), eps = 0.001) %>%
-      filter((term == "time" & time == 0) | (term == "response" & response == "Low Responder")) %>%
-      transmute(time, response, term_int = term, est_int = dydx, se_int = std.error,
-                p_int = p.value, cil_int = conf.low, ciu_int = conf.high))) %>%
-  select(-fit_intrank) %>%
-  unnest(res_int)
+lmer_ames_ps_int <- full_join(
+  lmer_res %>%
+    select(gene, ame_int) %>%
+    unnest(ame_int) %>%
+    select(gene, term, time, response, dydx, std.error, p.value),
+  lmer_res %>%
+    select(gene, ame_intrank) %>%
+    unnest(ame_intrank) %>%
+    select(gene, term, time, response, dydx, std.error, p.value),
+  by = c("gene", "term", "time", "response"), suffix = c("_init", "_rank"))
 
-lmer_ame_noint <- lmer_fits %>%
-  select(gene, fit_noint) %>%
-  mutate(res_noint = list(
-    fit_noint %>% marginaleffects() %>% tidy() %>%
-      transmute(term_noint = term, est_noint = estimate, se_noint = std.error, 
-                p_noint = p.value, cil_noint = conf.low, ciu_noint = conf.high))) %>%
-  select(-fit_noint) %>%
-  unnest(res_noint)
+# Betas and p-values для моделей без пересечения
 
-lmer_ame_nointrank <- lmer_fits %>%
-  select(gene, fit_nointrank) %>%
-  mutate(res_noint = list(
-    fit_nointrank %>% marginaleffects() %>% tidy() %>%
-      transmute(term_noint = term, est_noint = estimate, se_noint = std.error, 
-                p_noint = p.value, cil_noint = conf.low, ciu_noint = conf.high))) %>%
-  select(-fit_nointrank) %>%
-  unnest(res_noint)
+lmer_betas_ps_noint <- full_join(
+  lmer_res %>%
+    select(gene, beta_p_noint) %>%
+    unnest(beta_p_noint) %>%
+    select(gene, term, estimate, std.error, p.value),
+  lmer_res %>%
+    select(gene, beta_p_nointrank) %>%
+    unnest(beta_p_nointrank) %>%
+    select(gene, term, estimate, std.error, p.value),
+  by = c("gene", "term"), suffix = c("_init", "_rank"))
 
-# Сохраним результаты в rds, чтобы при формировании отчёта не ждать оценки регрессий
-saveRDS(lmer_p_int, "OlgaMironenko/res/lmer_p_int.rds")
-saveRDS(lmer_p_intrank, "OlgaMironenko/res/lmer_p_intrank.rds")
-saveRDS(lmer_ame_int, "OlgaMironenko/res/lmer_ame_int.rds")
-saveRDS(lmer_ame_noint, "OlgaMironenko/res/lmer_ame_noint.rds")
-saveRDS(lmer_ame_intrank, "OlgaMironenko/res/lmer_ame_intrank.rds")
-saveRDS(lmer_ame_nointrank, "OlgaMironenko/res/lmer_ame_nointrank.rds")
+# # Сохраним результаты в rds, чтобы при формировании отчёта не ждать оценки регрессий
+saveRDS(lmer_betas_ps_int, "OlgaMironenko/res/lmer_betas_ps_int.rds")
+saveRDS(lmer_betas_ps_noint, "OlgaMironenko/res/lmer_betas_ps_noint.rds")
+saveRDS(lmer_ames_ps_int, "OlgaMironenko/res/lmer_ames_ps_int.rds")
 ```
 
 
@@ -879,35 +877,41 @@ saveRDS(lmer_ame_nointrank, "OlgaMironenko/res/lmer_ame_nointrank.rds")
 
 
 ```r
-lmer_p_int_plt <- bind_rows(
-  lmer_p_int %>%
-    mutate(model = "Expression as is"),
-  lmer_p_intrank %>%
-    mutate(model = "Rank by expression")) %>%
-  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression"))) %>%
-  pivot_wider(id_cols = c("gene", "model"), names_from = "term", values_from = "p")
-
+lmer_p_int_plt <- lmer_betas_ps_int %>%
+  filter(grepl("response", term)) %>%
+  transmute(gene, term = ifelse(grepl("time", term), "b3", "b2"), p.value_init, p.value_rank) %>%
+  pivot_longer(cols = contains("p.value"), names_to = "model", values_to = "p",
+               names_pattern = "p.value_(.+)") %>%
+  mutate(p = -log10(p),
+         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression"))) %>%
+  pivot_wider(id_cols = c(gene, model), names_from = "term", values_from = "p")
+  
 critv <- -log10(0.05)
 
-genes_int_both5_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
-                                              lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 > critv]
-genes_int_both5_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
-                                              lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 > critv]
-genes_int_b25_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
-                                            lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 <= critv]
-genes_int_b35_init <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[1] &
-                                            lmer_p_int_plt$b2 <= critv & lmer_p_int_plt$b3 > critv]
-genes_int_b25_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
-                                            lmer_p_int_plt$b2 > critv & lmer_p_int_plt$b3 <= critv]
-genes_int_b35_rank <- lmer_p_int_plt$gene[lmer_p_int_plt$model == levels(lmer_p_int_plt$model)[2] &
-                                            lmer_p_int_plt$b2 <= critv & lmer_p_int_plt$b3 > critv]
+genes_int_sig <- list(
+  b2b3_init = lmer_p_int_plt %>% filter(b2 > critv & b3 > critv & model == "Expression as is") %>% pull(gene),
+  b2b3_rank = lmer_p_int_plt %>% filter(b2 > critv & b3 > critv & model != "Expression as is") %>% pull(gene),
+  b2_init = lmer_p_int_plt %>% filter(b2 > critv & b3 <= critv & model == "Expression as is") %>% pull(gene),
+  b2_rank = lmer_p_int_plt %>% filter(b2 > critv & b3 <= critv & model != "Expression as is") %>% pull(gene),
+  b3_init = lmer_p_int_plt %>% filter(b2 <= critv & b3 > critv & model == "Expression as is") %>% pull(gene),
+  b3_rank = lmer_p_int_plt %>% filter(b2 <= critv & b3 > critv & model != "Expression as is") %>% pull(gene)
+)
+
+genes_int_sig_clin <- lmer_p_int_plt %>%
+  filter(!(b2 <= critv & b3 <= critv)) %>%
+  mutate(b2sig = b2 > critv, b3sig = b3 > critv) %>%
+  nest(-c(model, b2sig, b3sig)) %>%
+  mutate(genes_sig = map(data, ~ .x %>% arrange(-pmax(b2, b3)) %>% filter(row_number() %in% c(1:5)))) %>%
+  select(-data) %>%
+  unnest(genes_sig)
 
 ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
-  geom_point(color = "#499894", alpha = 0.5) +
+  geom_point(color = "#86BCB6", alpha = 0.5) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_vline(aes(xintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
-  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
-  geom_vline(aes(xintercept = critv), linewidth = 0.7, color = "red") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
+  geom_vline(aes(xintercept = critv), linewidth = 0.7, color = "#E15759") +
+  geom_text_repel(aes(label = gene), genes_int_sig_clin, size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
   facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
@@ -942,24 +946,30 @@ ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
 
 
 ```r
-lmer_v_noint_plt <- bind_rows(
-  lmer_ame_noint %>%
-    filter(term_noint == "response") %>%
-    transmute(gene, est = est_noint, p = p_noint, model = "Expression as is"),
-  lmer_ame_nointrank %>%
-    filter(term_noint == "response") %>%
-    transmute(gene, est = est_noint, p = p_noint, model = "Rank by expression")) %>%
-  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression")))
+lmer_v_noint_plt <- lmer_betas_ps_noint %>%
+  filter(grepl("response", term)) %>%
+  pivot_longer(cols = -c(gene, term), names_pattern = "(estimate|std.error|p.value)_(.+)$",
+               names_to = c(".value", "model")) %>%
+  mutate(p.value = -log10(p.value),
+         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")))
+  
+genes_noint_sig <- lmer_v_noint_plt %>%
+  nest(-model) %>%
+  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% pull(gene))) %>%
+  select(-data)
 
-genes_noint_b25_init <- lmer_v_noint_plt$gene[lmer_v_noint_plt$model == levels(lmer_p_int_plt$model)[1] &
-                                                lmer_v_noint_plt$p > critv]
-genes_noint_b25_rank <- lmer_v_noint_plt$gene[lmer_v_noint_plt$model == levels(lmer_p_int_plt$model)[2] &
-                                                lmer_v_noint_plt$p > critv]
+genes_noint_sig_clin <- lmer_v_noint_plt %>%
+  nest(-model) %>%
+  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% arrange(estimate) %>%
+                           filter(row_number() %in% c(1:5, (n()-4):n())))) %>%
+  select(-data) %>%
+  unnest(genes_sig)
 
-ggplot(lmer_v_noint_plt, aes(x = est, y = p)) +
-  geom_point(color = "#499894", alpha = 0.5) +
+ggplot(lmer_v_noint_plt, aes(x = estimate, y = p.value)) +
+  geom_point(color = "#86BCB6", alpha = 0.5) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
-  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
+  geom_text_repel(aes(label = gene), genes_noint_sig_clin, size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.01, 0)) +
   facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
@@ -987,21 +997,32 @@ ggplot(lmer_v_noint_plt, aes(x = est, y = p)) +
 
 
 ```r
-lmer_v_int_plt <- bind_rows(
-  lmer_ame_int %>%
-    filter(term_int == "response") %>%
-    transmute(gene, time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
-              est = est_int, p = p_int, model = "Expression as is"),
-  lmer_ame_intrank %>%
-    filter(term_int == "response") %>%
-    transmute(gene, time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
-              est = est_int, p = p_int, model = "Rank by expression")) %>%
-  mutate(p = -log10(p), model = factor(model, c("Expression as is", "Rank by expression")))
+lmer_v_int_plt <- lmer_ames_ps_int %>%
+  filter(term == "response" & response == "Low Responder") %>%
+  select(-term, -response) %>%
+  pivot_longer(cols = -c(gene, time), names_pattern = "(dydx|std.error|p.value)_(.+)$",
+               names_to = c(".value", "model")) %>%
+  mutate(p.value = -log10(p.value),
+         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")),
+         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
 
-ggplot(lmer_v_int_plt, aes(x = est, y = p)) +
-  geom_point(color = "#499894", alpha = 0.5) +
+genes_int_sig_time <- lmer_v_int_plt %>%
+  nest_by(model, time) %>%
+  mutate(genes_sig = list(data$gene[data$p.value > critv])) %>%
+  select(-data)
+
+genes_int_sig_time_clin <- lmer_v_int_plt %>%
+  nest(-c(model, time)) %>%
+  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% arrange(dydx) %>%
+                           filter(row_number() %in% c(1:5, (n()-4):n())))) %>%
+  select(-data) %>%
+  unnest(genes_sig)
+  
+ggplot(lmer_v_int_plt, aes(x = dydx, y = p.value)) +
+  geom_point(color = "#86BCB6", alpha = 0.5) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
+  geom_text_repel(aes(label = gene), genes_int_sig_time_clin, size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
   facet_rep_grid(time ~ model, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
