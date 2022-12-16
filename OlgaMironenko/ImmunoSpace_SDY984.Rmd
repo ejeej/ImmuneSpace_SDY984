@@ -536,6 +536,8 @@ lmer_ames_ps_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ames_p
 Начнем с того, что посмотрим, **является ли эффект пересечения ответа и времени статистически значимым** в моделях с первичными оценками экспрессий и их рангами, т.е. меняется ли значимым образом разница между испытуемыми с разным уровнем ответа во времени. Для этого изобразим диаграммы рассеяния для каждой спецификации, где покажем значения p-value: по оси X - для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values.
 
 ```{r fig3_p12, fig.width=8, fig.height=5}
+critv <- -log10(0.05)
+
 lmer_p_int_plt <- lmer_betas_ps_int %>%
   filter(grepl("response", term)) %>%
   transmute(gene, term = ifelse(grepl("time", term), "b3", "b2"), p.value_init, p.value_rank) %>%
@@ -543,42 +545,38 @@ lmer_p_int_plt <- lmer_betas_ps_int %>%
                names_pattern = "p.value_(.+)") %>%
   mutate(p = -log10(p),
          model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression"))) %>%
-  pivot_wider(id_cols = c(gene, model), names_from = "term", values_from = "p")
-  
-critv <- -log10(0.05)
+  pivot_wider(id_cols = c(gene, model), names_from = "term", values_from = "p") %>%
+  mutate(b2sig = b2 > critv, b3sig = b3 > critv) %>%
+  group_by(model, b2sig, b3sig) %>%
+  arrange(-pmax(b2, b3)) %>%
+  mutate(sig = row_number() %in% c(1:5)) %>%
+  ungroup() %>%
+  mutate(sig = ifelse(!b2sig & !b3sig, FALSE, sig))
 
-genes_int_sig <- list(
-  b2b3_init = lmer_p_int_plt %>% filter(b2 > critv & b3 > critv & model == "Expression as is") %>% pull(gene),
-  b2b3_rank = lmer_p_int_plt %>% filter(b2 > critv & b3 > critv & model != "Expression as is") %>% pull(gene),
-  b2_init = lmer_p_int_plt %>% filter(b2 > critv & b3 <= critv & model == "Expression as is") %>% pull(gene),
-  b2_rank = lmer_p_int_plt %>% filter(b2 > critv & b3 <= critv & model != "Expression as is") %>% pull(gene),
-  b3_init = lmer_p_int_plt %>% filter(b2 <= critv & b3 > critv & model == "Expression as is") %>% pull(gene),
-  b3_rank = lmer_p_int_plt %>% filter(b2 <= critv & b3 > critv & model != "Expression as is") %>% pull(gene)
+genes_sig <- list(
+  init_int_b2b3 = lmer_p_int_plt %>% filter(b2sig & b3sig & model == "Expression as is") %>% pull(gene),
+  rank_int_b2b3 = lmer_p_int_plt %>% filter(b2sig & b3sig & model != "Expression as is") %>% pull(gene),
+  init_int_b2 = lmer_p_int_plt %>% filter(b2sig & !b3sig & model == "Expression as is") %>% pull(gene),
+  rank_int_b2 = lmer_p_int_plt %>% filter(b2sig & !b3sig & model != "Expression as is") %>% pull(gene),
+  init_int_b3 = lmer_p_int_plt %>% filter(!b2sig & b3sig & model == "Expression as is") %>% pull(gene),
+  rank_int_b3 = lmer_p_int_plt %>% filter(!b2sig & b3sig & model != "Expression as is") %>% pull(gene)
 )
 
-genes_int_sig_clin <- lmer_p_int_plt %>%
-  filter(!(b2 <= critv & b3 <= critv)) %>%
-  mutate(b2sig = b2 > critv, b3sig = b3 > critv) %>%
-  nest(-c(model, b2sig, b3sig)) %>%
-  mutate(genes_sig = map(data, ~ .x %>% arrange(-pmax(b2, b3)) %>% filter(row_number() %in% c(1:5)))) %>%
-  select(-data) %>%
-  unnest(genes_sig)
-
 ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
-  geom_point(color = "#86BCB6", alpha = 0.5) +
+  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_vline(aes(xintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
   geom_vline(aes(xintercept = critv), linewidth = 0.7, color = "#E15759") +
-  geom_text_repel(aes(label = gene), genes_int_sig_clin, size = 3) +
+  geom_text_repel(aes(label = gene), lmer_p_int_plt %>% filter(sig), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
+  scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
   labs(x = bquote(-log[10](p)~", response"), y = bquote(-log[10](p)~", response*time"), 
        title = "Figure 3. P-values for regression coefficients estimates",
        subtitle = "Linear mixed models with the interaction term",
-       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
-       The higher the axis value, the lower is the p-value.") +
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. The higher the axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
         # axis.line = element_blank(),
@@ -591,15 +589,17 @@ ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-Всего получается `r length(genes_int_sig$b2b3_init)` генов в модели с исходными значениями для экспрессии и `r length(genes_int_sig$b2b3_rank)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов на момент baseline, но и по его динамике. При этом эти списки пересекаются по `r length(intersect(genes_int_sig$b2b3_init, genes_int_sig$b2b3_rank))` генам: `r paste(intersect(genes_int_sig$b2b3_init, genes_int_sig$b2b3_rank), collapse = ", ")`.
+Всего получается `r length(genes_sig$init_int_b2b3)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_int_b2b3)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов на момент baseline, но и по его динамике. При этом эти списки пересекаются по `r length(intersect(genes_sig$init_int_b2b3, genes_sig$rank_int_b2b3))` генам: `r paste(intersect(genes_sig$init_int_b2b3, genes_sig$rank_int_b2b3), collapse = ", ")`.
 
-Ещё для `r length(genes_int_sig$b2_init)` (`r length(genes_int_sig$b2_rank)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах.
+Ещё для `r length(genes_sig$init_int_b2)` (`r length(genes_sig$rank_int_b2)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах.
 
-Ещё для `r length(genes_int_sig$b3_init)` (`r length(genes_int_sig$b3_rank)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+Ещё для `r length(genes_sig$init_int_b3)` (`r length(genes_sig$rank_int_b3)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+
+Выше на графике в каждой из этих трёх групп генов оранжевым выделено по 5 генов с самым маленьким p-value.
 
 <br>
 
-Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. Для этого мы воспользуемся результатами оценки регрессий без эффектов пересечения и построим  volcano plot для пар из $-log_{10}$-преобразования p-value и соответствующей оценки коэффициента при переменной для ответа. 
+Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. Для этого мы воспользуемся результатами оценки регрессий без эффектов пересечения и построим  volcano plot для пар из $-log_{10}$-преобразования p-value и соответствующей оценки коэффициента при переменной для ответа. Оранжевым выделим по 5 генов с p-value < 0.05 с самыми низкими и самыми высокими значениями оценки коэффициента.
 
 ```{r fig4_volcano, fig.width=6, fig.height=5}
 lmer_v_noint_plt <- lmer_betas_ps_noint %>%
@@ -607,27 +607,25 @@ lmer_v_noint_plt <- lmer_betas_ps_noint %>%
   pivot_longer(cols = -c(gene, term), names_pattern = "(estimate|std.error|p.value)_(.+)$",
                names_to = c(".value", "model")) %>%
   mutate(p.value = -log10(p.value),
-         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")))
-  
-genes_noint_sig <- lmer_v_noint_plt %>%
-  nest(-model) %>%
-  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% pull(gene))) %>%
-  select(-data)
+         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")),
+         b2sig = p.value > critv) %>%
+  group_by(model, b2sig) %>%
+  arrange(estimate) %>%
+  mutate(sig = row_number() %in% c(1:5, (n()-4):n())) %>%
+  ungroup() %>%
+  mutate(sig = ifelse(!b2sig, FALSE, sig))
 
-genes_noint_sig_clin <- lmer_v_noint_plt %>%
-  nest(-model) %>%
-  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% arrange(estimate) %>%
-                           filter(row_number() %in% c(1:5, (n()-4):n())))) %>%
-  select(-data) %>%
-  unnest(genes_sig)
+genes_sig$init_noint_b2 <- lmer_v_noint_plt %>% filter(b2sig & model == "Expression as is") %>% pull(gene)
+genes_sig$rank_noint_b2 <- lmer_v_noint_plt %>% filter(b2sig & model != "Expression as is") %>% pull(gene)
 
 ggplot(lmer_v_noint_plt, aes(x = estimate, y = p.value)) +
-  geom_point(color = "#86BCB6", alpha = 0.5) +
+  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
-  geom_text_repel(aes(label = gene), genes_noint_sig_clin, size = 3) +
+  geom_text_repel(aes(label = gene), lmer_v_noint_plt %>% filter(sig), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.01, 0)) +
+  scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
   labs(x = bquote("ATE for response" ~ (hat(beta[2]))), y = bquote(-log[10](p[hat(beta[2])])), 
        title = "Figure 4. P-values vs. effect sizes for response",
@@ -647,7 +645,7 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = p.value)) +
 
 <br>
 
-Наконец, можно изобразить графики, аналогичные приведённым выше, но для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, полученных по результатам для регрессий с эффектами пересечения. 
+Наконец, можно изобразить графики, аналогичные приведённым выше, но для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, полученных по результатам для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 с самыми низкими и самыми высокими значениями оценки коэффициента.
 
 ```{r fig5_volcano_time, fig.width=6, fig.height=12}
 lmer_v_int_plt <- lmer_ames_ps_int %>%
@@ -657,27 +655,32 @@ lmer_v_int_plt <- lmer_ames_ps_int %>%
                names_to = c(".value", "model")) %>%
   mutate(p.value = -log10(p.value),
          model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")),
-         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
+         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
+         b2sig = p.value > critv) %>%
+  group_by(model, time, b2sig) %>%
+  arrange(dydx) %>%
+  mutate(sig = row_number() %in% c(1:5, (n()-4):n())) %>%
+  ungroup() %>%
+  mutate(sig = ifelse(!b2sig, FALSE, sig))
 
-genes_int_sig_time <- lmer_v_int_plt %>%
-  nest_by(model, time) %>%
-  mutate(genes_sig = list(data$gene[data$p.value > critv])) %>%
-  select(-data)
+genes_sig <- c(genes_sig, map2(
+  rep(1:length(timepoints), 2),
+  rep(levels(lmer_v_int_plt$model), each = length(timepoints)),
+  ~ lmer_v_int_plt %>% 
+    filter(time == levels(lmer_v_int_plt$time)[.x] & model == .y & b2sig) %>%
+    pull(gene)) %>%
+    setNames(sprintf("%s_int_ame%d", 
+                     rep(c("init", "rank"), each = length(timepoints)), 
+                     rep(timepoints, 2))))
 
-genes_int_sig_time_clin <- lmer_v_int_plt %>%
-  nest(-c(model, time)) %>%
-  mutate(genes_sig = map(data, ~ .x %>% filter(p.value > critv) %>% arrange(dydx) %>%
-                           filter(row_number() %in% c(1:5, (n()-4):n())))) %>%
-  select(-data) %>%
-  unnest(genes_sig)
-  
 ggplot(lmer_v_int_plt, aes(x = dydx, y = p.value)) +
-  geom_point(color = "#86BCB6", alpha = 0.5) +
+  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
-  geom_text_repel(aes(label = gene), genes_int_sig_time_clin, size = 3) +
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(sig), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
+  scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ model, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
        title = "Figure 5. P-values vs. effect sizes for response",
@@ -694,6 +697,61 @@ ggplot(lmer_v_int_plt, aes(x = dydx, y = p.value)) +
         plot.title = element_text(size = 13, face = "bold"),
         plot.subtitle = element_text(size = 10),
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+```{r, echo=FALSE, eval=FALSE}
+# Для презентации
+
+p1 <- ggplot(lmer_v_int_plt %>% filter(model == "Expression as is"), aes(x = dydx, y = p.value)) +
+  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+  geom_hline(aes(yintercept = 1), linewidth = 0.3, color = "#E15759", linetype = "dashed") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.3, color = "red") +
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(model == "Expression as is" & sig), 
+                  size = 3, max.overlaps = 11) +
+  scale_x_continuous(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.02, 0)) +   
+  scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
+  facet_rep_grid(~ time, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
+  labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
+       title = "Figure 5(1). P-values vs. effect sizes for response (Expression as is)",
+       subtitle = "Average marginal effects after linear mixed models with the interaction term") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor = element_line(linewidth = .1, color = '#ebebebFF'),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 12, color = "black", face = "bold"),
+        strip.placement = "outside",
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+
+p2 <- ggplot(lmer_v_int_plt %>% filter(model != "Expression as is"), aes(x = dydx, y = p.value)) +
+  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+  geom_hline(aes(yintercept = 1), linewidth = 0.3, color = "#E15759", linetype = "dashed") +
+  geom_hline(aes(yintercept = critv), linewidth = 0.3, color = "red") +
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(model != "Expression as is" & sig), 
+                  size = 3, max.overlaps = 11) +
+  scale_x_continuous(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.02, 0)) +   
+  scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
+  facet_rep_grid(~ time, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
+  labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
+       title = "Figure 5(2). P-values vs. effect sizes for response (Rank by expression)",
+       subtitle = "Average marginal effects after linear mixed models with the interaction term") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor = element_line(linewidth = .1, color = '#ebebebFF'),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 12, color = "black", face = "bold"),
+        strip.placement = "outside",
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.subtitle = element_text(size = 10),
+        plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+
+ggpubr::ggarrange(p1, p2, nrow = 2)
+ggsave("Rplot.png", device = "png", width = 10, height = 7, dpi = 300)
 ```
 
 <br>
