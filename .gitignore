@@ -5,3 +5,7 @@
 data/all_noNorm_withResponse_eset.rds
 OlgaMironenko/ImmunoSpace_SDY984.html
 OlgaMironenko/res/lmer_res.rds
+OlgaMironenko/res/hg_res.rds
+OlgaMironenko/res/ft_res.rds
+OlgaMironenko/res/ft_res_pq.rds
+OlgaMironenko/ImmunoSpace_SDY984_app.Rmd

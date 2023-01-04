@@ -6,8 +6,9 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     code_folding: hide
-    # toc: yes
-    # toc_float: true
+    toc: yes
+    toc_float: true
+    toc_depth: 3
     # theme: cerulean
     keep_md: true
 editor_options:
@@ -20,6 +21,7 @@ editor_options:
 .math {
 font-size: small;
 }
+
 </style>
 
 ```{r setup, warning = FALSE, message = FALSE}
@@ -29,17 +31,124 @@ library(gtsummary)
 library(ggbeeswarm)
 library(ggrepel)
 library(lemon)
+library(ComplexUpset)
+library(colorspace)
 library(lme4)
 library(lmerTest)
 library(marginaleffects)
 library(broom.mixed)
+library(qvalue)
+library(knitr)
 if (identical(knitr::opts_knit$get("rmarkdown.runtime"), "shiny")) {
   library(shiny)
 }
 
+options(knitr.kable.NA = '')
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
 
 list("style_number-arg:big.mark" = "") %>% set_gtsummary_theme()
+
+# Function for upset plots
+
+upset_plot <- function(data, sets_names, rowcolors, title, subtitle, showh = TRUE, ab_hjust = -0.95) {
+  
+  p1 <- upset(
+    data, sets_names, name = "gene", sort_sets = FALSE,
+    sort_intersections = "ascending", sort_intersections_by = c("degree", "cardinality"),
+    wrap = TRUE, set_sizes = FALSE,
+    base_annotations = list("Inclusive intersection size" = (
+      intersection_size(
+        mode = "intersect",
+        # mapping = aes(fill = exclusive_intersection),
+        text_mapping = aes(y = !!get_size_mode("inclusive_intersection"),
+                           colour = "on_background"),
+        text = list(size = 3.5)
+      ) +
+        scale_y_continuous(expand = c(0.07,0)) +
+        labs(title = "A. Inclusive intersection size") +
+        theme(legend.position = "none",
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              axis.ticks.y = element_line(color = "grey50", linewidth = 0.2),
+              axis.text.y = element_text(size = 8),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = ab_hjust, size = 11, face = "bold")))),
+    matrix = intersection_matrix(
+      outline_color = list(active = "#4F6980", inactive = "white"),
+      segment = geom_segment(color = "#4F6980")
+    ) +
+      scale_color_manual(values = c("TRUE" = "#4F6980", "FALSE" = "white"), guide = "none"),
+    stripes = upset_stripes(colors = rowcolors),
+    themes = upset_modify_themes(list(
+      intersections_matrix = theme(panel.grid.major = element_blank(),
+                                   panel.grid.minor = element_blank(),
+                                   axis.text.y = element_text(size = 10),
+                                   axis.title.x = element_blank()))))
+  p2 <- upset(
+    data, sets_names, name = "gene", sort_sets = FALSE, 
+    sort_intersections = "ascending", sort_intersections_by = c("degree", "cardinality"),
+    wrap = TRUE, set_sizes = FALSE,
+    base_annotations = list("Intersection size" = (
+      intersection_size(
+        text_mapping = aes(y = !!get_size_mode("exclusive_intersection"),
+                           colour = "on_background"),
+        text = list(size = 3.5)
+      ) + 
+        annotate(geom = "text", x = Inf, y = Inf,
+                 label = sprintf("%d\nunique genes", nrow(data)),
+                 vjust = 1, hjust = 1) +
+        scale_y_continuous(expand = c(0.07,0)) +
+        labs(title = "B. Exclusive intersection size") +
+        theme(panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              axis.ticks.y = element_line(color = "grey50", linewidth = 0.2),
+              axis.text.y = element_text(size = 8),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = ab_hjust, size = 11, face = "bold")))),
+    matrix = intersection_matrix(
+      outline_color = list(active = "#4F6980", inactive = "white"),
+      segment = geom_segment(color = "#4F6980")
+    ) +
+      scale_color_manual(values = c("TRUE" = "#4F6980", "FALSE" = "white"), guide = "none"),
+    stripes = upset_stripes(colors = rowcolors),
+    themes = upset_modify_themes(list(
+      intersections_matrix = theme(panel.grid.major = element_blank(),
+                                   panel.grid.minor = element_blank(),
+                                   axis.text.y = element_text(size = 10),
+                                   axis.title.x = element_blank()))))
+  
+  if (showh) {
+    p1 +
+      labs(title = title, subtitle = subtitle) +
+      theme(plot.title = element_text(size = 13, face = "bold"),
+            plot.subtitle = element_text(size = 10)) +
+      p2
+  } else {
+    ((p1 +
+        labs(title = title, subtitle = subtitle) +
+        theme(plot.title = element_text(size = 13, face = "bold"),
+              plot.subtitle = element_text(size = 10))) 
+     /
+       (p2))
+  }
+}
+
+# Function for getting BPs (GO) for genes strored in "gene" column of df
+
+bp_genesF <- function(df) {
+  AnnotationDbi::select(
+    org.Hs.eg.db::org.Hs.eg.db, 
+    df %>% pull(gene) %>% unique(), 
+    c("GENENAME", "GO"), "SYMBOL") %>% 
+    filter(ONTOLOGY == "BP") %>%
+    mutate(TERM = AnnotationDbi::Term(GO)) %>%
+    filter(!is.na(TERM)) %>%
+    transmute(TERM, gene = SYMBOL) %>%
+    unique() %>%
+    group_by(TERM) %>%
+    summarise(n = n(), genes = paste(gene, collapse = ", ")) %>%
+    arrange(-n)
+}
 
 # Данные https://www.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2
 
@@ -91,12 +200,10 @@ df_expr <- expr_t %>%
   separate(uid, c("participant_id", "time", NA, NA), 
            sep = "_", remove = FALSE, convert = TRUE) %>%
   filter(participant_id %in% df_subj_baseline$participant_id) %>%
-  left_join(df_subj %>% 
-              transmute(uid, igg_postvax = ImmResp_postVax_value_MFC), 
+  left_join(df_subj %>% transmute(uid, igg_postvax = ImmResp_postVax_value_MFC), 
             by = "uid") %>%
-  left_join(df_subj_baseline %>% 
-              select(participant_id, arm_accession, gender, race, ethnicity, 
-                     igg_baseline, response), 
+  left_join(df_subj_baseline %>% select(participant_id, arm_accession, gender, 
+                                        race, ethnicity, igg_baseline, response), 
             by = "participant_id")
 
 # Уберём гены с одними пропусками по экспрессии
@@ -285,6 +392,13 @@ mwtest_p <- suppressWarnings({df_expr_long_fin %>%
            p_adj_group = cut(p_adj, c(0, 0.05, 1.1), c("< 0.05", "$\\geq$ 0.05"), right = FALSE))
 })
 
+genes_sig_mw <- AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, mwtest_p$gene[mwtest_p$p_adj < 0.05], 
+                                      c("GENENAME", "GO"), "SYMBOL") %>% 
+  filter(ONTOLOGY == "BP") %>%
+  mutate(TERM = AnnotationDbi::Term(GO)) %>%
+  transmute(gene = SYMBOL, TERM) %>%
+  unique()
+
 tbl_summary(
   mwtest_p %>% select(timeF, p_group, p_adj_group), 
   by = "timeF",
@@ -374,9 +488,9 @@ ggplot(df_expr_long_fin %>% filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05
 
 <br>
 
-[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2) - это белок, который регулирует активность лейкоцитов, отвечающих за иммунитет. 
+[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это `r genes_sig_mw$GENENAME[genes_sig_mw$gene == "IL2RA"][1]` ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2), участвующий в регулировании активности лейкоцитов, отвечающих за иммунитет. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$gene == "IL2RA"], collapse = "; ")`.
 
-[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов.
+[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это `r genes_sig_mw$GENENAME[genes_sig_mw$gene == "RIC3"][1]` ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$gene == "RIC3"], collapse = "; ")`.
 
 <br>
 
@@ -440,7 +554,6 @@ df_expr_long_fin <- df_expr_long_fin %>%
 
 Оценка линейных смешанных моделей будет выполнена с помощью функции `lmer` из пакета `lme4`, а оценка средних предельных эффектов - с помощью функции `marginaleffects` из одноименного пакета. Заметим, что если в `marginaleffects` после модели с эффектами пересечения задать конкретные временные точки (например, $time=$ `r paste(timepoints, collapse = ",")`), то для переменной $response$ мы получим искомые значения ATE в этих точках ($\beta_2 + \beta_3*time$) вместе с их p-values, а если этого не сделать, то на выходе для переменной $response$ мы получим оценку ATE, равную оценке коэффициента $\beta_2$ из модели без эффекта пересечения.
 
-
 ```{r mixedmodels, eval=FALSE}
 # Оценка линейных смешанных моделей
 
@@ -475,56 +588,121 @@ lmer_res <- lmer_fits %>%
 
 # Betas and p-values для моделей с пересечением
 
-lmer_betas_ps_int <- full_join(
+lmer_betas_int <- full_join(
   lmer_res %>%
     select(gene, beta_p_int) %>%
     unnest(beta_p_int) %>%
-    select(gene, term, estimate, std.error, p.value),
+    select(gene, term, estimate, p.value),
   lmer_res %>%
     select(gene, beta_p_intrank) %>%
     unnest(beta_p_intrank) %>%
-    select(gene, term, estimate, std.error, p.value),
+    select(gene, term, estimate, p.value),
   by = c("gene", "term"), suffix = c("_init", "_rank"))
-  
+
 # AMEs/ATEs and p-values для моделей с пересечением
 
-lmer_ames_ps_int <- full_join(
+lmer_ames_int <- full_join(
   lmer_res %>%
     select(gene, ame_int) %>%
     unnest(ame_int) %>%
-    select(gene, term, time, response, dydx, std.error, p.value),
+    select(gene, term, time, response, dydx, p.value),
   lmer_res %>%
     select(gene, ame_intrank) %>%
     unnest(ame_intrank) %>%
-    select(gene, term, time, response, dydx, std.error, p.value),
+    select(gene, term, time, response, dydx, p.value),
   by = c("gene", "term", "time", "response"), suffix = c("_init", "_rank"))
 
 # Betas and p-values для моделей без пересечения
 
-lmer_betas_ps_noint <- full_join(
+lmer_betas_noint <- full_join(
   lmer_res %>%
     select(gene, beta_p_noint) %>%
     unnest(beta_p_noint) %>%
-    select(gene, term, estimate, std.error, p.value),
+    select(gene, term, estimate, p.value),
   lmer_res %>%
     select(gene, beta_p_nointrank) %>%
     unnest(beta_p_nointrank) %>%
-    select(gene, term, estimate, std.error, p.value),
+    select(gene, term, estimate, p.value),
   by = c("gene", "term"), suffix = c("_init", "_rank"))
 
 # # Сохраним результаты в rds, чтобы при формировании отчёта не ждать оценки регрессий
-saveRDS(lmer_betas_ps_int, "OlgaMironenko/res/lmer_betas_ps_int.rds")
-saveRDS(lmer_betas_ps_noint, "OlgaMironenko/res/lmer_betas_ps_noint.rds")
-saveRDS(lmer_ames_ps_int, "OlgaMironenko/res/lmer_ames_ps_int.rds")
+saveRDS(lmer_betas_int, "OlgaMironenko/res/lmer_betas_int.rds")
+saveRDS(lmer_betas_noint, "OlgaMironenko/res/lmer_betas_noint.rds")
+saveRDS(lmer_ames_int, "OlgaMironenko/res/lmer_ames_int.rds")
 ```
 
-```{r loadres, echo=FALSE}
-# lmer_betas_ps_int <- readRDS("OlgaMironenko/res/lmer_betas_ps_int.rds")
-# lmer_betas_ps_noint <- readRDS("OlgaMironenko/res/lmer_betas_ps_noint.rds")
-# lmer_ames_ps_int <- readRDS("OlgaMironenko/res/lmer_ames_ps_int.rds")
-lmer_betas_ps_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_betas_ps_int.rds"))
-lmer_betas_ps_noint <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_betas_ps_noint.rds"))
-lmer_ames_ps_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ames_ps_int.rds"))
+```{r load_lmer_res, echo=FALSE}
+# lmer_betas_int <- readRDS("OlgaMironenko/res/lmer_betas_int.rds")
+# lmer_betas_noint <- readRDS("OlgaMironenko/res/lmer_betas_noint.rds")
+# lmer_ames_int <- readRDS("OlgaMironenko/res/lmer_ames_int.rds")
+lmer_betas_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_betas_int.rds"))
+lmer_betas_noint <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_betas_noint.rds"))
+lmer_ames_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ames_int.rds"))
+
+critv <- -log10(0.05)
+
+# Data frame for all betas and p-values for all LMMs
+
+lmer_res_long <- bind_rows(
+  lmer_betas_int %>%
+    filter(grepl("response", term)) %>%
+    transmute(gene, model = "int", term = ifelse(grepl("time", term), "b3", "b2"), 
+              estimate_init, estimate_rank, p.value_init, p.value_rank,
+              time = NA) %>%
+    pivot_longer(cols = -c(gene, model, term, time), 
+                 names_pattern = "(estimate|p.value)_(.+)$",
+                 names_to = c(".value", "expr")),
+  lmer_betas_noint %>%
+    filter(grepl("response", term)) %>%
+    pivot_longer(cols = -c(gene, term), names_pattern = "(estimate|p.value)_(.+)$",
+                 names_to = c(".value", "expr")) %>%
+    mutate(model = "noint", term = "b2", time = NA),
+  lmer_ames_int %>%
+    filter(term == "response" & response == "Low Responder") %>%
+    select(-term, -response) %>%
+    pivot_longer(cols = -c(gene, time), names_pattern = "(dydx|p.value)_(.+)$",
+                 names_to = c(".value", "expr")) %>%
+    mutate(model = "int", term = sprintf("ame%d", time)) %>%
+    rename(estimate = dydx)
+) %>%
+  mutate(logp = -log10(p.value),
+         sig = logp > critv,
+         model_var = sprintf("%s_%s_%s", expr, model, term),
+         expr = factor(expr, c("init", "rank"), c("Expression as is", "Rank by expression")),
+         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
+
+# Significant genes
+
+genes_sig <- map(
+  lmer_res_long %>%
+    filter(sig) %>%
+    split(f = as.factor(.$model_var)),
+  ~ .x %>% pull(gene))
+
+models <- names(genes_sig)
+models_num <- as.numeric(str_extract(models, "\\d+"))
+
+genes_sig_lbls <- sprintf("%s, %s (%s)",
+                          ifelse(grepl("init",models), "Expr.", "Ranks"),
+                          ifelse(grepl("ame",models), "sig. ATE", 
+                                 ifelse(models_num == 2, "sig. b2", "sig. b3")),
+                          ifelse(grepl("ame0|_int_b2", models), "Baseline",
+                                 ifelse(grepl("b3", models), "Change",
+                                        ifelse(grepl("noint", models), "Overall",
+                                               sprintf("%d d.", models_num))))) %>%
+  as.list() %>% setNames(models)
+
+# Simultaneous significance for the main and intercation terms
+
+lmer_sig_int <- lmer_res_long %>%
+  filter(model == "int" & !grepl("ame", term)) %>%
+  pivot_wider(id_cols = c(gene, expr), names_from = "term", values_from = c("logp", "sig"))
+
+genes_sig$init_int_b2b3 <- lmer_sig_int %>% filter(sig_b2 & sig_b3 & expr == "Expression as is") %>% pull(gene)
+genes_sig$rank_int_b2b3 <- lmer_sig_int %>% filter(sig_b2 & sig_b3 & expr != "Expression as is") %>% pull(gene)
+
+genes_sig_lbls$init_int_b2b3 <- "Expr., sig. b2 and b3"
+genes_sig_lbls$rank_int_b2b3 <- "Ranks, sig. b2 and b3"
 ```
 
 <br>
@@ -533,48 +711,91 @@ lmer_ames_ps_int <- readRDS(file.path("..", "OlgaMironenko", "res", "lmer_ames_p
 
 <br>
 
-Начнем с того, что посмотрим, **является ли эффект пересечения ответа и времени статистически значимым** в моделях с первичными оценками экспрессий и их рангами, т.е. меняется ли значимым образом разница между испытуемыми с разным уровнем ответа во времени. Для этого изобразим диаграммы рассеяния для каждой спецификации, где покажем значения p-value: по оси X - для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values.
+#### **Наборы значимых генов в разных моделях**
 
-```{r fig3_p12, fig.width=8, fig.height=5}
-critv <- -log10(0.05)
+<br>
 
-lmer_p_int_plt <- lmer_betas_ps_int %>%
-  filter(grepl("response", term)) %>%
-  transmute(gene, term = ifelse(grepl("time", term), "b3", "b2"), p.value_init, p.value_rank) %>%
-  pivot_longer(cols = contains("p.value"), names_to = "model", values_to = "p",
-               names_pattern = "p.value_(.+)") %>%
-  mutate(p = -log10(p),
-         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression"))) %>%
-  pivot_wider(id_cols = c(gene, model), names_from = "term", values_from = "p") %>%
-  mutate(b2sig = b2 > critv, b3sig = b3 > critv) %>%
-  group_by(model, b2sig, b3sig) %>%
-  arrange(-pmax(b2, b3)) %>%
-  mutate(sig = row_number() %in% c(1:5)) %>%
+Всего получилось `r length(genes_sig$init_noint_b2)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_noint_b2)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
+
+В регрессиях с эффектами пересечения обнарудилось `r length(genes_sig$init_int_b2b3)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_int_b2b3)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для `r length(genes_sig$init_int_b2) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b2) - length(genes_sig$rank_int_b2b3)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для `r length(genes_sig$init_int_b3) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b3) - length(genes_sig$rank_int_b2b3)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+
+Ниже на графике покажем, насколько пересекаются наборы генов-находок, выявленных по статистической значимости коэффициентов в моделях с и без эффектов пересечения.
+
+```{r fig3_upset_int_noint, fig.width=10, fig.height=12}
+upset_plt_df <- cbind(
+  gene = genes_maxvar$gene,
+  map_dfc(genes_sig[grepl("_b\\d$", names(genes_sig))], ~ genes_maxvar$gene %in% .x)) %>%
+  filter(if_any(-gene, ~.)) %>%
+  setNames(c("gene", genes_sig_lbls[names(.)[-1]]))
+
+upset_plot(upset_plt_df, rev(colnames(upset_plt_df)[-1]), 
+           c(darken("#A0CBE8"), rep("#A0CBE8", 2), darken("#F1CE63"), rep("#F1CE63", 2)),
+           "Figure 3. Intersection of gene sets with significant coefficients",
+           "Linear mixed models with and without the interaction term", FALSE, -0.3) +
+  labs(caption = "Models with the interaction term:\n sig. b2 (Baseline) = p < 0.05 for the coeff-t near the main effect of the response,\n sig. b3 (Change) = p < 0.05 for the coeff-t near the response * time interaction.\nModels without the interaction term:\n sig. b2 (Overall) = p < 0.05 coeff-t for the response.") +
+  theme(plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+<br>
+
+Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value для соответствующего ATE < 0.05).
+
+```{r fig4_upset_ame, fig.width=10, fig.height=5}
+# Whether each gene was significant in any model
+genes_maxvar <- cbind(
+  genes_maxvar,
+  map_dfc(genes_sig[!grepl("b2b3", names(genes_sig))], ~ genes_maxvar$gene %in% .x))
+
+upset_plt_df_1 <- genes_maxvar %>%
+  select(contains("init_int_ame")) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(genes_sig_lbls[names(.)])
+
+upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+           rep("#F1CE63", 4),
+           "Figure 4(1). Intersection of gene sets with significant ATEs,\nExpression as is",
+           "Linear mixed models with the interaction term", TRUE, -0.8)
+
+upset_plt_df_2 <- genes_maxvar %>%
+  select(contains("rank_int_ame")) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(genes_sig_lbls[names(.)])
+
+upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+           rep("#A0CBE8", 4),
+           "Figure 4(2). Intersection of gene sets with significant ATEs,\nRanks by expression",
+           "Linear mixed models with the interaction term", TRUE, -0.8)
+```
+
+<br>
+
+#### **Различия в экспрессии генов до вакцинации vs. изменение экспрессии генов**
+
+<br>
+
+Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения для каждого гена мы можем сопоставить соответствующие p-values - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
+
+```{r fig5_p12, fig.width=8, fig.height=5}
+lmer_p_int_plt <- lmer_sig_int %>%
+  group_by(expr, sig_b2, sig_b3) %>%
+  arrange(-pmax(logp_b2, logp_b3)) %>%
+  mutate(sig_plot = row_number() %in% c(1:5)) %>%
   ungroup() %>%
-  mutate(sig = ifelse(!b2sig & !b3sig, FALSE, sig))
+  mutate(sig_plot = ifelse(!sig_b2 & !sig_b3, FALSE, sig_plot))
 
-genes_sig <- list(
-  init_int_b2b3 = lmer_p_int_plt %>% filter(b2sig & b3sig & model == "Expression as is") %>% pull(gene),
-  rank_int_b2b3 = lmer_p_int_plt %>% filter(b2sig & b3sig & model != "Expression as is") %>% pull(gene),
-  init_int_b2 = lmer_p_int_plt %>% filter(b2sig & !b3sig & model == "Expression as is") %>% pull(gene),
-  rank_int_b2 = lmer_p_int_plt %>% filter(b2sig & !b3sig & model != "Expression as is") %>% pull(gene),
-  init_int_b3 = lmer_p_int_plt %>% filter(!b2sig & b3sig & model == "Expression as is") %>% pull(gene),
-  rank_int_b3 = lmer_p_int_plt %>% filter(!b2sig & b3sig & model != "Expression as is") %>% pull(gene)
-)
-
-ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
-  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+ggplot(lmer_p_int_plt, aes(x = logp_b2, y = logp_b3)) +
+  geom_point(aes(color = sig_plot), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_vline(aes(xintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
   geom_vline(aes(xintercept = critv), linewidth = 0.7, color = "#E15759") +
-  geom_text_repel(aes(label = gene), lmer_p_int_plt %>% filter(sig), size = 3) +
+  geom_text_repel(aes(label = gene), lmer_p_int_plt %>% filter(sig_plot), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
-  facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
+  facet_rep_wrap(~ expr, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
   labs(x = bquote(-log[10](p)~", response"), y = bquote(-log[10](p)~", response*time"), 
-       title = "Figure 3. P-values for regression coefficients estimates",
+       title = "Figure 5. P-values for regression coefficients estimates",
        subtitle = "Linear mixed models with the interaction term",
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. The higher the axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -589,49 +810,52 @@ ggplot(lmer_p_int_plt, aes(x = b2, y = b3)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-Всего получается `r length(genes_sig$init_int_b2b3)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_int_b2b3)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов на момент baseline, но и по его динамике. При этом эти списки пересекаются по `r length(intersect(genes_sig$init_int_b2b3, genes_sig$rank_int_b2b3))` генам: `r paste(intersect(genes_sig$init_int_b2b3, genes_sig$rank_int_b2b3), collapse = ", ")`.
+<br>
 
-Ещё для `r length(genes_sig$init_int_b2)` (`r length(genes_sig$rank_int_b2)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах.
+Для генов с p-value < 0.05 хотя бы у одного из коэффициентов $\beta_2$ и $\beta_3$ с помощью базы Gene Ontology мы определили, в каких процессах участвуют их биологические продукты - ниже представим 10 процессов, в которых задействовано наибольшее число этих генов:
 
-Ещё для `r length(genes_sig$init_int_b3)` (`r length(genes_sig$rank_int_b3)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
-
-Выше на графике в каждой из этих трёх групп генов оранжевым выделено по 5 генов с самым маленьким p-value.
+```{r tab4_p12_bp}
+bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2)) %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 4. Biological processes (GO) for the most significant genes</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
 
 <br>
 
-Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. Для этого мы воспользуемся результатами оценки регрессий без эффектов пересечения и построим  volcano plot для пар из $-log_{10}$-преобразования p-value и соответствующей оценки коэффициента при переменной для ответа. Оранжевым выделим по 5 генов с p-value < 0.05 с самыми низкими и самыми высокими значениями оценки коэффициента.
+#### **Статистическая значимость vs. размер эффекта**
 
-```{r fig4_volcano, fig.width=6, fig.height=5}
-lmer_v_noint_plt <- lmer_betas_ps_noint %>%
-  filter(grepl("response", term)) %>%
-  pivot_longer(cols = -c(gene, term), names_pattern = "(estimate|std.error|p.value)_(.+)$",
-               names_to = c(".value", "model")) %>%
-  mutate(p.value = -log10(p.value),
-         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")),
-         b2sig = p.value > critv) %>%
-  group_by(model, b2sig) %>%
+<br>
+
+Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. 
+
+Ниже представлен volcano plot для результатов оценки регрессий без эффектов пересечения, где по оси Y показано значение $-log_{10}$-преобразования p-value, а по оси X - оценка соответствующего коэффициента при переменной для ответа. Оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
+
+```{r fig5_volcano, fig.width=6, fig.height=5}
+lmer_v_noint_plt <- lmer_res_long %>%
+  filter(model == "noint") %>%
+  group_by(expr, sig) %>%
   arrange(estimate) %>%
-  mutate(sig = row_number() %in% c(1:5, (n()-4):n())) %>%
+  mutate(sig_plot = row_number() %in% c(1:5, (n()-4):n())) %>%
   ungroup() %>%
-  mutate(sig = ifelse(!b2sig, FALSE, sig))
+  mutate(sig_plot = ifelse(!sig, FALSE, sig_plot))
 
-genes_sig$init_noint_b2 <- lmer_v_noint_plt %>% filter(b2sig & model == "Expression as is") %>% pull(gene)
-genes_sig$rank_noint_b2 <- lmer_v_noint_plt %>% filter(b2sig & model != "Expression as is") %>% pull(gene)
-
-ggplot(lmer_v_noint_plt, aes(x = estimate, y = p.value)) +
-  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+ggplot(lmer_v_noint_plt, aes(x = estimate, y = logp)) +
+  geom_point(aes(color = sig_plot), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "#E15759") +
-  geom_text_repel(aes(label = gene), lmer_v_noint_plt %>% filter(sig), size = 3) +
+  geom_text_repel(aes(label = gene), lmer_v_noint_plt %>% filter(sig_plot), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.01, 0)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
-  facet_rep_wrap(~ model, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
+  facet_rep_wrap(~ expr, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
   labs(x = bquote("ATE for response" ~ (hat(beta[2]))), y = bquote(-log[10](p[hat(beta[2])])), 
-       title = "Figure 4. P-values vs. effect sizes for response",
+       title = "Figure 5. P-value vs. effect size for response",
        subtitle = "Linear mixed models without the interaction term",
-       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
-       The higher the Y axis value, the lower is the p-value.") +
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
         panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
@@ -645,48 +869,53 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = p.value)) +
 
 <br>
 
-Наконец, можно изобразить графики, аналогичные приведённым выше, но для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, полученных по результатам для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 с самыми низкими и самыми высокими значениями оценки коэффициента.
+Опять же, с помощью базы Gene Ontology мы можем определить, в каких процессах участвуют биологические продукты генов с наименьшими и наибольшими значимыми (на 5%-ном уровне значимости) средними эффектами ответа (т.е. с наибольшей по абсолютной величине отрицательной и положительной разницей в средней экспрессии генов во всех точках между сильно и слабо ответившими на вакцинацию). Будем считать размер эффекта большим, если по абсолютной величине он превысит 0.25 для исходных данных по экспрессии (результаты для рангов здесь анализировать не будемп). Ниже в таблице представим результаты в виде перечня из 10 процессов, в которых участвует наибольшее число генов с большим отрицательным (downregulated - экспрессия/ ранг, в среднем, больше у слабо ответивших) и большим положительным (upregulated - экспрессия/ ранг, в среднем, больше у сильно ответивших) эффектами.
 
-```{r fig5_volcano_time, fig.width=6, fig.height=12}
-lmer_v_int_plt <- lmer_ames_ps_int %>%
-  filter(term == "response" & response == "Low Responder") %>%
-  select(-term, -response) %>%
-  pivot_longer(cols = -c(gene, time), names_pattern = "(dydx|std.error|p.value)_(.+)$",
-               names_to = c(".value", "model")) %>%
-  mutate(p.value = -log10(p.value),
-         model = factor(model, c("init", "rank"), c("Expression as is", "Rank by expression")),
-         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))),
-         b2sig = p.value > critv) %>%
-  group_by(model, time, b2sig) %>%
-  arrange(dydx) %>%
-  mutate(sig = row_number() %in% c(1:5, (n()-4):n())) %>%
+```{r tab5_v_bp}
+bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate > 0.25)) %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(1). Biological processes (GO) for the significant upregulated genes</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+bp_genesF(lmer_v_noint_plt %>%
+            filter(sig & expr == "Expression as is" & estimate < -0.25)) %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(2). Biological processes (GO) for the significant downregulated genes</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
+
+<br>
+
+Аналогичные графики и таблицы можно построить и для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, используя результаты для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
+
+```{r fig6_volcano_time, fig.width=6, fig.height=12}
+lmer_v_int_plt <- lmer_res_long %>%
+  filter(grepl("ame", term)) %>%
+  group_by(expr, time, sig) %>%
+  arrange(estimate) %>%
+  mutate(sig_plot = row_number() %in% c(1:5, (n()-4):n())) %>%
   ungroup() %>%
-  mutate(sig = ifelse(!b2sig, FALSE, sig))
+  mutate(sig_plot = ifelse(!sig, FALSE, sig_plot))
 
-genes_sig <- c(genes_sig, map2(
-  rep(1:length(timepoints), 2),
-  rep(levels(lmer_v_int_plt$model), each = length(timepoints)),
-  ~ lmer_v_int_plt %>% 
-    filter(time == levels(lmer_v_int_plt$time)[.x] & model == .y & b2sig) %>%
-    pull(gene)) %>%
-    setNames(sprintf("%s_int_ame%d", 
-                     rep(c("init", "rank"), each = length(timepoints)), 
-                     rep(timepoints, 2))))
-
-ggplot(lmer_v_int_plt, aes(x = dydx, y = p.value)) +
-  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
+  geom_point(aes(color = sig_plot), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.7, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.7, color = "red") +
-  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(sig), size = 3) +
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(sig_plot), size = 3) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
-  facet_rep_grid(time ~ model, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
+  facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
-       title = "Figure 5. P-values vs. effect sizes for response",
+       title = "Figure 6. P-value vs. effect size for response",
        subtitle = "Average marginal effects after linear mixed models with the interaction term",
-       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. 
-       The higher the Y axis value, the lower is the p-value.") +
+       caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
         panel.grid.major = element_line(linewidth = .2, color = '#ebebebFF'),
@@ -699,21 +928,25 @@ ggplot(lmer_v_int_plt, aes(x = dydx, y = p.value)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-```{r, echo=FALSE, eval=FALSE}
+<br>
+
+С одной стороны, визуально заметно некоторое "растягивание" точек вправо и влево к 7 дням от вакцинации, а с другой стороны, по отдельным генам, для которых разница в средней экспрессии до вакцинации между сильными и слабыми респондервами была наибольшей по абсолютной величине, заметно её уменьшение.
+
+```{r fig6_pres, echo=FALSE, eval=FALSE}
 # Для презентации
 
-p1 <- ggplot(lmer_v_int_plt %>% filter(model == "Expression as is"), aes(x = dydx, y = p.value)) +
-  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+p1 <- ggplot(lmer_v_int_plt %>% filter(expr == "Expression as is"), aes(x = estimate, y = logp)) +
+  geom_point(aes(color = sig_plot), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.3, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.3, color = "red") +
-  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(model == "Expression as is" & sig), 
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(expr == "Expression as is" & sig_plot), 
                   size = 3, max.overlaps = 11) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +   
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(~ time, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
-       title = "Figure 5(1). P-values vs. effect sizes for response (Expression as is)",
+       title = "Figure 6(1). P-values vs. effect sizes for response (Expression as is)",
        subtitle = "Average marginal effects after linear mixed models with the interaction term") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
@@ -726,18 +959,18 @@ p1 <- ggplot(lmer_v_int_plt %>% filter(model == "Expression as is"), aes(x = dyd
         plot.subtitle = element_text(size = 10),
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 
-p2 <- ggplot(lmer_v_int_plt %>% filter(model != "Expression as is"), aes(x = dydx, y = p.value)) +
-  geom_point(aes(color = sig), alpha = 0.5, show.legend = FALSE) +
+p2 <- ggplot(lmer_v_int_plt %>% filter(expr != "Expression as is"), aes(x = estimate, y = logp)) +
+  geom_point(aes(color = sig_plot), alpha = 0.5, show.legend = FALSE) +
   geom_hline(aes(yintercept = 1), linewidth = 0.3, color = "#E15759", linetype = "dashed") +
   geom_hline(aes(yintercept = critv), linewidth = 0.3, color = "red") +
-  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(model != "Expression as is" & sig), 
+  geom_text_repel(aes(label = gene), lmer_v_int_plt %>% filter(expr != "Expression as is" & sig_plot), 
                   size = 3, max.overlaps = 11) +
   scale_x_continuous(expand = c(0.02, 0)) +
   scale_y_continuous(expand = c(0.02, 0)) +   
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(~ time, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
-       title = "Figure 5(2). P-values vs. effect sizes for response (Rank by expression)",
+       title = "Figure 6(2). P-values vs. effect sizes for response (Rank by expression)",
        subtitle = "Average marginal effects after linear mixed models with the interaction term") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
@@ -756,13 +989,315 @@ ggsave("Rplot.png", device = "png", width = 10, height = 7, dpi = 300)
 
 <br>
 
+И таблицы по 10 upregulated и downregulated биологических процессов в каждой точке исследования, определённых аналогично описанному выше принципу (по размеру эффекта для исходных данных по экспрессии):
+
+```{r tab6_v_bp}
+t61 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate > 0.25))
+
+t61 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(1). Biological processes (GO) for the significant upregulated genes, Baseline</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t62 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate > 0.25))
+
+t62 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(2). Biological processes (GO) for the significant upregulated genes, 1 day</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t63 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate > 0.25))
+
+t63 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(3). Biological processes (GO) for the significant upregulated genes, 3 days</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t64 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate > 0.25))
+
+t64 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(4). Biological processes (GO) for the significant upregulated genes, 7 days</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t65 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate < -0.25))
+
+t65 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(5). Biological processes (GO) for the significant downregulated genes, Baseline</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t66 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate < -0.25))
+
+t66 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(6). Biological processes (GO) for the significant downregulated genes, 1 day</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t67 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate < -0.25))
+
+t67 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(7). Biological processes (GO) for the significant downregulated genes, 3 days</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+
+t68 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate < -0.25))
+
+t68 %>%
+  head(10) %>%
+  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(8). Biological processes (GO) for the significant downregulated genes, 7 days</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
+
+<br>
+
+Из всех up- и downregulated биологических процессов выделим те, которые связаны с иммунной системой (содержат слово "immune" в своём названии) и покажем в таблице ниже, какие их них попадают в число up- (+) и downregulated (-) в каждой точке исследования (отсортируем по убыванию среднего числа генов из числа значимых, представляющих соответствующий процесс в каждой точке и имеющих большой положительный или отрицательный средний эффект):
+
+```{r tab7_ud}
+t7 <- bind_rows(
+  t61 %>% mutate(reg = "+", time = 0),
+  t62 %>% mutate(reg = "+", time = 1),
+  t63 %>% mutate(reg = "+", time = 3),
+  t64 %>% mutate(reg = "+", time = 7),
+  t65 %>% mutate(reg = "-", time = 0),
+  t66 %>% mutate(reg = "-", time = 1),
+  t67 %>% mutate(reg = "-", time = 3),
+  t68 %>% mutate(reg = "-", time = 7)
+) %>%
+  filter(grepl("immune", TERM, ignore.case = TRUE)) %>%
+  group_by(TERM) %>%
+  summarise(n = ceiling(mean(n))) %>%
+  mutate(d0 = case_when(TERM %in% t61$TERM & TERM %in% t65$TERM ~ 3,
+                        TERM %in% t61$TERM ~ 1,
+                        TERM %in% t65$TERM ~ 2),
+         d1 = case_when(TERM %in% t62$TERM & TERM %in% t66$TERM ~ 3,
+                        TERM %in% t62$TERM ~ 1,
+                        TERM %in% t66$TERM ~ 2),
+         d3 = case_when(TERM %in% t63$TERM & TERM %in% t67$TERM ~ 3,
+                        TERM %in% t63$TERM ~ 1,
+                        TERM %in% t67$TERM ~ 2),
+         d7 = case_when(TERM %in% t64$TERM & TERM %in% t68$TERM ~ 3,
+                        TERM %in% t64$TERM ~ 1,
+                        TERM %in% t68$TERM ~ 2)) %>%
+  mutate_at(vars(contains("d")), ~ factor(., 1:3, c("$+$", "$-$", "+/-"))) %>%
+  arrange(-n, as.numeric(d0))
+
+t7 %>%
+  kable(align = "lccccc", col.names = c("BP (GO term)", "Mean N, sig.genes", "Baseline", paste(timepoints[-1], "d.")), 
+        caption = "<b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b>",
+        escape = FALSE) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 13,
+                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
+
+<br>
+
+## **Функциональный анализ**
+
+<br>
+
+Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты найденных нами генов. Выше мы уже использовали GO для определения аннотаций для этих процессов по некоторым наборам генов.
+
+Поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, гены для каких именно биологических процессов "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа. 
+
+В своём исследовании мы будем выявлять такие процессы, основываясь на оценке p-values гипергеометрического распределения, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
+где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
+
+В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости - мы в качестве порога будем использовать 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+
+SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей.
+
+```{r hypergtest, eval=FALSE}
+# library(org.Hs.eg.db)
+# library(GOstats)
+
+# org.Hs.eg.db - Genome wide annotation for Human
+# EntrezID for genes (exclude those with NA)
+
+genes_universe <- genes_maxvar %>%
+  left_join(AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, genes_maxvar$gene, "ENTREZID", "SYMBOL") %>%
+              distinct(SYMBOL, .keep_all = TRUE),
+            by = c("gene" = "SYMBOL")) %>%
+  filter(!is.na(ENTREZID))
+
+# Conditional hypergeometric test for each set of significant genes
+# https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html
+
+hg_res <- map(
+  genes_universe %>% select(contains("init"), contains("rank")),
+  function(x) {
+    hg_params <- new(getClassDef("GOHyperGParams", package = "Category"),
+                     geneIds = genes_universe$ENTREZID[x],
+                     universeGeneIds = genes_universe$ENTREZID,
+                     annotation = "org.Hs.eg",
+                     ontology = "BP",
+                     pvalueCutoff = 0.05,
+                     conditional = TRUE,
+                     minSizeCutoff = 10, maxSizeCutoff = 500,
+                     testDirection = "over")
+    Category::hyperGTest(hg_params)
+  })
+
+# # Saving results into rds (in case of necessity, without sending to github)
+# saveRDS(hg_res, "OlgaMironenko/res/hg_res.rds")
+# 
+# # hg_res <- readRDS("OlgaMironenko/res/hg_res.rds")
+# hg_res <- readRDS(file.path("..", "OlgaMironenko", "res", "hg_res.rds"))
+
+ann_select_q <- purrr::quietly(.f = AnnotationDbi::select)
+
+# Genes in significant BPs
+
+hg_res_sig_genes <- imap(
+  hg_res, 
+  function(x, y) {
+    imap_dfr(Category::geneIdsByCategory(x, summary(x)$GOBPID),
+             ~ ann_select_q(org.Hs.eg.db::org.Hs.eg.db, .x, "SYMBOL", "ENTREZID") %>%
+               .$result %>% 
+               left_join(lmer_res_long %>% filter(model_var == y),
+                         by = c("SYMBOL" = "gene")) %>%
+               transmute(GOID = .y, genes = paste(SYMBOL, collapse = "/"),
+                         up = sum(estimate > 0), down = sum(estimate <= 0)) %>%
+               unique())
+  })
+
+# Results for hypergeom.test for each model
+
+hg_res_pq <- imap(
+  hg_res,
+  ~ cbind(pvalue = Category::pvalues(.x),
+          Count = Category::geneCounts(.x))%>%
+    as_tibble(rownames = "GOID") %>%
+    # adjusting p-values and calculate qvalues
+    mutate(GeneRatio = Count/length(Category::geneIds(.x)),
+           p.adjust = p.adjust(pvalue, method = "BH"),
+           qvalue = qvalue(pvalue) %>% .$qvalues) %>%
+    # joining BP terms and definitions
+    left_join(
+      AnnotationDbi::select(GO.db::GO.db, .$GOID, c("TERM", "DEFINITION"), keytype = "GOID"),
+      by = "GOID") %>%
+    # joining genes for significant BPs
+    left_join(
+      hg_res_sig_genes[[.y]], by = "GOID"))
+
+# Saving the main results into rds for not waiting for results while knitting
+saveRDS(hg_res_pq, "OlgaMironenko/res/hg_res_pq.rds")
+```
+
+```{r fishtest, echo=FALSE, eval=FALSE}
+# Fisher's exact test
+# http://yulab-smu.top/biomedical-knowledge-mining-book/clusterprofiler-go.html
+
+ft_res <- map(
+  genes_universe %>% select(contains("init"), contains("rank")),
+  ~ clusterProfiler::enrichGO(genes_universe$ENTREZID[.x],
+                              org.Hs.eg.db,
+                              keyType = "ENTREZID",
+                              ont = "BP",
+                              pvalueCutoff = 0.05,
+                              pAdjustMethod = "BH",
+                              genes_universe$ENTREZID,
+                              qvalueCutoff = 1,
+                              minGSSize = 10,
+                              maxGSSize = 500,
+                              readable = TRUE)
+)
+
+# saveRDS(ft_res, "OlgaMironenko/res/ft_res.rds")
+# # ft_res <- readRDS("OlgaMironenko/res/ft_res.rds")
+# ft_res <- readRDS(file.path("..", "OlgaMironenko", "res", "ft_res.rds"))
+
+ft_res_pq <- map(ft_res, ~ .x@result %>% mutate(GeneRatio = eval(parse(text = GeneRatio))))
+
+saveRDS(ft_res_pq, "OlgaMironenko/res/ft_res_pq.rds")
+
+# ft_res_pq <- readRDS("OlgaMironenko/res/ft_res_pq.rds")
+ft_res_pq <- readRDS(file.path("..", "OlgaMironenko", "res", "ft_res_pq.rds"))
+
+ft_res_n <- imap_dfr(
+  ft_res_pq, 
+  ~ tibble(Model = genes_sig_lbls[[.y]],
+           p01 = sum(.x$p.adjust < 0.1),
+           p005 = sum(.x$p.adjust < 0.05),
+           p001 = sum(.x$p.adjust < 0.01),
+           p0001 = sum(.x$p.adjust < 0.001),
+           q01 = sum(.x$qvalue < 0.1),
+           q005 = sum(.x$qvalue < 0.05),
+           q001 = sum(.x$qvalue < 0.01),
+           q0001 = sum(.x$qvalue < 0.001)))
+```
+
+Ниже для каждого набора значимых генов в каждой спецификации линейной смешанной модели покажем количество "перепредставленных" этим набором биологических процессов при разных пороговых значениях для скорректированных p-values и для q-values (пустая ячейка означает отсутствие процессов, удовлетворяющих соответствующему критерию).
+
+```{r tab8_hypergres}
+# hg_res_pq <- readRDS("OlgaMironenko/res/hg_res_pq.rds")
+hg_res_pq <- readRDS(file.path("..", "OlgaMironenko", "res", "hg_res_pq.rds"))
+
+imap_dfr(
+  hg_res_pq, 
+  ~ tibble(model = genes_sig_lbls[[.y]],
+           p01 = sum(.x$p.adjust < 0.1),
+           p005 = sum(.x$p.adjust < 0.05),
+           p001 = sum(.x$p.adjust < 0.01),
+           p0001 = sum(.x$p.adjust < 0.001),
+           q01 = sum(.x$qvalue < 0.1),
+           q005 = sum(.x$qvalue < 0.05),
+           q001 = sum(.x$qvalue < 0.01),
+           q0001 = sum(.x$qvalue < 0.001))) %>%
+  mutate_if(is.numeric, ~ ifelse(. == 0, NA, .)) %>%
+  kable(align = "lcccccccc",
+        col.names = c("Gene set source", rep(paste("< ", c(0.1,0.05,0.01,0.001)), 2)),
+        caption = "<b>Table 8. Number of significant biological processes (GO) found in hypergeometric tests</b>") %>%
+  kableExtra::add_header_above(c(" " = 1, "Adjusted p-value" = 4, "q-value" = 4)) %>% 
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
+                            html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
+
+```{r, echo=FALSE, eval=FALSE}
+hg_res_pq$rank_int_b2
+hg_res_pq$rank_int_ame0
+hg_res_pq$rank_int_ame1
+```
+
+<br>
+
+Видим, что в моделях с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленным в каком-либо из наборов генов со значимыми различиями в экспрессии в какой-либо точке или в её динамике в зависимости от уровня ответа на вакцинацию. В моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди "значимых" (`r gsub("/", ", ", hg_res_pq$rank_int_b2$genes[1])`), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
+
+Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (только в модели с рангами, для ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
+
+<br>
+
 ## **Планы по дальнейшим этапам анализа**
 
 <br>
 
 - Определить, какое изменение экспрессии/ ранга гена по экспрессии считать клинически значимым, и соответствующим образом интерпретировать результаты, отраженные на volcano plots.
-
-- Определить, в какие сигнальные пути входят гены, эффекты которых оказались статистически и/или клинически значимыми.
 
 - Для каждого гена оценить логистическую регрессию для зависимости ответа на вакцинацию от его экспрессии в разных точках. Так мы выявим гены, экспрессия которых в какой-либо точке была связана с оцененным впоследствии ответом на вакцинацию. Для этих генов также определим, в какие сигнальные пути они входят.
 
