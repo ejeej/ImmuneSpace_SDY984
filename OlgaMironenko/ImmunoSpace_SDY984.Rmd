@@ -139,14 +139,14 @@ bp_genesF <- function(df) {
   AnnotationDbi::select(
     org.Hs.eg.db::org.Hs.eg.db, 
     df %>% pull(gene) %>% unique(), 
-    c("GENENAME", "GO"), "SYMBOL") %>% 
+    "GO", "SYMBOL") %>% 
     filter(ONTOLOGY == "BP") %>%
-    mutate(TERM = AnnotationDbi::Term(GO)) %>%
-    filter(!is.na(TERM)) %>%
-    transmute(TERM, gene = SYMBOL) %>%
+    mutate(TERM = AnnotationDbi::Term(GO), DEFINITION = AnnotationDbi::Definition(GO)) %>%
+    filter(!is.na(TERM) & TERM != "biological_process") %>%
+    transmute(SYMBOL, GO, TERM, DEFINITION) %>%
     unique() %>%
     group_by(TERM) %>%
-    summarise(n = n(), genes = paste(gene, collapse = ", ")) %>%
+    summarise(GOBPID = unique(GO), def = unique(DEFINITION), n = n(), genes = paste(SYMBOL, collapse = ", ")) %>%
     arrange(-n)
 }
 
@@ -228,6 +228,10 @@ df_expr_long <- df_expr %>%
 - с помощью оценки различий в экспрессии генов между испытуемыми, ответившими и не ответившими на вакцинацию, 
 
 - с помощью оценки взаимосвязи между экспрессией генов (и её динамикой) и итоговым ответом на вакцинацию.
+
+<br>
+
+Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты генов-находок (генов с дифференциальной экспрессией для групп испытуемых с разной силой ответа на вакцинацию или генов, экспрессия которых окажется значимым образом связанной с ответом).
 
 <br>
 
@@ -395,8 +399,8 @@ mwtest_p <- suppressWarnings({df_expr_long_fin %>%
 genes_sig_mw <- AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, mwtest_p$gene[mwtest_p$p_adj < 0.05], 
                                       c("GENENAME", "GO"), "SYMBOL") %>% 
   filter(ONTOLOGY == "BP") %>%
-  mutate(TERM = AnnotationDbi::Term(GO)) %>%
-  transmute(gene = SYMBOL, TERM) %>%
+  mutate(TERM = AnnotationDbi::Term(GO), DEFINITION = AnnotationDbi::Definition(GO)) %>%
+  select(SYMBOL, GENENAME, TERM, DEFINITION) %>%
   unique()
 
 tbl_summary(
@@ -526,9 +530,9 @@ df_expr_long_fin <- df_expr_long_fin %>%
 
 - $expr_{ij}$ - экспрессия гена для _i_-го испытуемого в точке исследования _j_; оценим отдельно спецификации с:
 
-- исходными данными по экспрессии, 
+  - исходными данными по экспрессии, 
 
-- рангами генов по экспрессии, рассчитанными для каждого испытуемого в каждой точке исследования как квантиль эмпрической функции распределения экспрессий по всем генам для этого испытуемого в этой точке, 
+  - рангами генов по экспрессии, рассчитанными для каждого испытуемого в каждой точке исследования как квантиль эмпрической функции распределения экспрессий по всем генам для этого испытуемого в этой точке, 
 
 - $time_j$ - точка исследования (в днях от вакцинации), 
 
@@ -692,7 +696,7 @@ genes_sig_lbls <- sprintf("%s, %s (%s)",
                                                sprintf("%d d.", models_num))))) %>%
   as.list() %>% setNames(models)
 
-# Simultaneous significance for the main and intercation terms
+# Simultaneous significance for the main and interaction terms
 
 lmer_sig_int <- lmer_res_long %>%
   filter(model == "int" & !grepl("ame", term)) %>%
@@ -715,9 +719,9 @@ genes_sig_lbls$rank_int_b2b3 <- "Ranks, sig. b2 and b3"
 
 <br>
 
-Всего получилось `r length(genes_sig$init_noint_b2)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_noint_b2)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
+Всего получилось `r length(genes_sig$init_noint_b2)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_noint_b2)` генов в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
 
-В регрессиях с эффектами пересечения обнарудилось `r length(genes_sig$init_int_b2b3)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_int_b2b3)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для `r length(genes_sig$init_int_b2) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b2) - length(genes_sig$rank_int_b2b3)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для `r length(genes_sig$init_int_b3) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b3) - length(genes_sig$rank_int_b2b3)`) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+В регрессиях с эффектами пересечения обнаружилось `r length(genes_sig$init_int_b2b3)` генов в модели с исходными значениями для экспрессии и `r length(genes_sig$rank_int_b2b3)` гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для `r length(genes_sig$init_int_b2) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b2) - length(genes_sig$rank_int_b2b3)`) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для `r length(genes_sig$init_int_b3) - length(genes_sig$init_int_b2b3)` (`r length(genes_sig$rank_int_b3) - length(genes_sig$rank_int_b2b3)`) генов был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
 
 Ниже на графике покажем, насколько пересекаются наборы генов-находок, выявленных по статистической значимости коэффициентов в моделях с и без эффектов пересечения.
 
@@ -738,7 +742,7 @@ upset_plot(upset_plt_df, rev(colnames(upset_plt_df)[-1]),
 
 <br>
 
-Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value для соответствующего ATE < 0.05).
+Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value < 0.05 для соответствующего ATE).
 
 ```{r fig4_upset_ame, fig.width=10, fig.height=5}
 # Whether each gene was significant in any model
@@ -773,7 +777,7 @@ upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
 
 <br>
 
-Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения для каждого гена мы можем сопоставить соответствующие p-values - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
+Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения мы можем сопоставить соответствующие p-values для каждого гена - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
 
 ```{r fig5_p12, fig.width=8, fig.height=5}
 lmer_p_int_plt <- lmer_sig_int %>%
@@ -815,11 +819,15 @@ ggplot(lmer_p_int_plt, aes(x = logp_b2, y = logp_b3)) +
 Для генов с p-value < 0.05 хотя бы у одного из коэффициентов $\beta_2$ и $\beta_3$ с помощью базы Gene Ontology мы определили, в каких процессах участвуют их биологические продукты - ниже представим 10 процессов, в которых задействовано наибольшее число этих генов:
 
 ```{r tab4_p12_bp}
-bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2)) %>%
+t4 <- bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2))
+t4$GOBPID <- kableExtra::cell_spec(t4$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t4$GOBPID))
+
+t4 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 4. Biological processes (GO) for the most significant genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 4. Biological processes (GO) for genes with significant coefficients in linear mixed models, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
@@ -830,7 +838,7 @@ bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2)) %>%
 
 <br>
 
-Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. 
+Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего эффекта ответа на вакцинацию с размером этого эффекта**. 
 
 Ниже представлен volcano plot для результатов оценки регрессий без эффектов пересечения, где по оси Y показано значение $-log_{10}$-преобразования p-value, а по оси X - оценка соответствующего коэффициента при переменной для ответа. Оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
 
@@ -869,30 +877,37 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = logp)) +
 
 <br>
 
-Опять же, с помощью базы Gene Ontology мы можем определить, в каких процессах участвуют биологические продукты генов с наименьшими и наибольшими значимыми (на 5%-ном уровне значимости) средними эффектами ответа (т.е. с наибольшей по абсолютной величине отрицательной и положительной разницей в средней экспрессии генов во всех точках между сильно и слабо ответившими на вакцинацию). Будем считать размер эффекта большим, если по абсолютной величине он превысит 0.25 для исходных данных по экспрессии (результаты для рангов здесь анализировать не будемп). Ниже в таблице представим результаты в виде перечня из 10 процессов, в которых участвует наибольшее число генов с большим отрицательным (downregulated - экспрессия/ ранг, в среднем, больше у слабо ответивших) и большим положительным (upregulated - экспрессия/ ранг, в среднем, больше у сильно ответивших) эффектами.
+Опять же, с помощью базы Gene Ontology мы можем определить, в каких процессах участвуют биологические продукты генов с наименьшими и наибольшими значимыми (на 5%-ном уровне значимости) средними эффектами ответа (т.е. с наибольшей по абсолютной величине отрицательной и положительной разницей в средней экспрессии генов во всех точках между сильно и слабо ответившими на вакцинацию). Будем считать размер эффекта большим, если по абсолютной величине он превысит 0.25 для исходных данных по экспрессии (результаты для рангов здесь анализировать не будем). Ниже в таблице представим результаты в виде перечня из 10 процессов, в которых участвует наибольшее число генов с большим отрицательным (downregulated - экспрессия, в среднем, больше у слабо ответивших) и большим положительным (upregulated - экспрессия, в среднем, больше у сильно ответивших) эффектами.
 
 ```{r tab5_v_bp}
-bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate > 0.25)) %>%
+t51 <- bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate > 0.25))
+t51$GOBPID <- kableExtra::cell_spec(t51$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t51$GOBPID))
+
+t51 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 5(1). Biological processes (GO) for the significant upregulated genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(1). Biological processes (GO) for significant upregulated genes, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
-bp_genesF(lmer_v_noint_plt %>%
-            filter(sig & expr == "Expression as is" & estimate < -0.25)) %>%
+t52 <- bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate < -0.25))
+t52$GOBPID <- kableExtra::cell_spec(t52$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t52$GOBPID))
+
+t52 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 5(2). Biological processes (GO) for the significant downregulated genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(2). Biological processes (GO) for significant downregulated genes, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <br>
 
-Аналогичные графики и таблицы можно построить и для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, используя результаты для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
+Аналогичные графики и таблицы можно построить и для оценки **среднего эффекта ответа в отдельных точках исследования**, используя результаты для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки ATE.
 
 ```{r fig6_volcano_time, fig.width=6, fig.height=12}
 lmer_v_int_plt <- lmer_res_long %>%
@@ -989,93 +1004,109 @@ ggsave("Rplot.png", device = "png", width = 10, height = 7, dpi = 300)
 
 <br>
 
-И таблицы по 10 upregulated и downregulated биологических процессов в каждой точке исследования, определённых аналогично описанному выше принципу (по размеру эффекта для исходных данных по экспрессии):
+И таблицы по 10 биологических процессов, в которых участвуют продукты up- и downregulated генов в каждой точке исследования (с большими положительными и отрицательными значениями среднего эффекта, соответственно):
 
 ```{r tab6_v_bp}
 t61 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate > 0.25))
+t61$GOBPID <- kableExtra::cell_spec(t61$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t61$GOBPID))
 
 t61 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(1). Biological processes (GO) for the significant upregulated genes, Baseline</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(1). Biological processes (GO) for significant upregulated genes, Baseline, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t62 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate > 0.25))
+t62$GOBPID <- kableExtra::cell_spec(t62$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t62$GOBPID))
 
 t62 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(2). Biological processes (GO) for the significant upregulated genes, 1 day</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(2). Biological processes (GO) for significant upregulated genes, 1 day, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t63 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate > 0.25))
+t63$GOBPID <- kableExtra::cell_spec(t63$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t63$GOBPID))
 
 t63 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(3). Biological processes (GO) for the significant upregulated genes, 3 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(3). Biological processes (GO) for significant upregulated genes, 3 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t64 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate > 0.25))
+t64$GOBPID <- kableExtra::cell_spec(t64$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t64$GOBPID))
 
 t64 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(4). Biological processes (GO) for the significant upregulated genes, 7 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(4). Biological processes (GO) for significant upregulated genes, 7 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t65 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate < -0.25))
+t65$GOBPID <- kableExtra::cell_spec(t65$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t65$GOBPID))
 
 t65 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(5). Biological processes (GO) for the significant downregulated genes, Baseline</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(5). Biological processes (GO) for significant downregulated genes, Baseline, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t66 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate < -0.25))
+t66$GOBPID <- kableExtra::cell_spec(t66$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t66$GOBPID))
 
 t66 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(6). Biological processes (GO) for the significant downregulated genes, 1 day</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(6). Biological processes (GO) for significant downregulated genes, 1 day, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t67 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate < -0.25))
+t67$GOBPID <- kableExtra::cell_spec(t67$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t67$GOBPID))
 
 t67 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(7). Biological processes (GO) for the significant downregulated genes, 3 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(7). Biological processes (GO) for significant downregulated genes, 3 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 
 t68 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate < -0.25))
+t68$GOBPID <- kableExtra::cell_spec(t68$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t68$GOBPID))
 
 t68 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(8). Biological processes (GO) for the significant downregulated genes, 7 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(8). Biological processes (GO) for significant downregulated genes, 7 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <br>
 
-Из всех up- и downregulated биологических процессов выделим те, которые связаны с иммунной системой (содержат слово "immune" в своём названии) и покажем в таблице ниже, какие их них попадают в число up- (+) и downregulated (-) в каждой точке исследования (отсортируем по убыванию среднего числа генов из числа значимых, представляющих соответствующий процесс в каждой точке и имеющих большой положительный или отрицательный средний эффект):
+Из всех биологических процессов для up- и downregulated генов выделим те, которые связаны с иммунной системой (содержат слово "immune" в своём названии) и покажем в таблице ниже, какие их них попадают в число up- (+) и downregulated (-) в каждой точке исследования (отсортируем по убыванию среднего числа генов из числа значимых, представляющих соответствующий процесс в каждой точке):
 
 ```{r tab7_ud}
 t7 <- bind_rows(
@@ -1089,7 +1120,9 @@ t7 <- bind_rows(
   t68 %>% mutate(reg = "-", time = 7)
 ) %>%
   filter(grepl("immune", TERM, ignore.case = TRUE)) %>%
-  group_by(TERM) %>%
+  group_by(GOBPID, TERM, time) %>%
+  summarise(n = sum(n)) %>%
+  group_by(GOBPID, TERM) %>%
   summarise(n = ceiling(mean(n))) %>%
   mutate(d0 = case_when(TERM %in% t61$TERM & TERM %in% t65$TERM ~ 3,
                         TERM %in% t61$TERM ~ 1,
@@ -1103,13 +1136,13 @@ t7 <- bind_rows(
          d7 = case_when(TERM %in% t64$TERM & TERM %in% t68$TERM ~ 3,
                         TERM %in% t64$TERM ~ 1,
                         TERM %in% t68$TERM ~ 2)) %>%
-  mutate_at(vars(contains("d")), ~ factor(., 1:3, c("$+$", "$-$", "+/-"))) %>%
+  mutate_at(vars(matches("d\\d")), ~ factor(., 1:3, c("$+$", "$-$", "+/-"))) %>%
   arrange(-n, as.numeric(d0))
 
 t7 %>%
-  kable(align = "lccccc", col.names = c("BP (GO term)", "Mean N, sig.genes", "Baseline", paste(timepoints[-1], "d.")), 
-        caption = "<b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b>",
-        escape = FALSE) %>% 
+  kable(escape = FALSE, align = "clccccc",
+        col.names = c("GOBPID", "BP (GO term)", "Mean N, sig.genes", "Baseline", paste(timepoints[-1], "d.")), 
+        caption = "<b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b>") %>% 
   kableExtra::row_spec(0, bold = TRUE) %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 13,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
@@ -1121,14 +1154,12 @@ t7 %>%
 
 <br>
 
-Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты найденных нами генов. Выше мы уже использовали GO для определения аннотаций для этих процессов по некоторым наборам генов.
-
-Поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, гены для каких именно биологических процессов "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа. 
+Выше мы уже использовали базу Gene Ontology (GO) для определения аннотаций биологических процессов, в которых участвуют белковые продукты генов, дифференциально экспрессированных у испытуемых с разным уровнем ответа на вакцинацию. Однако поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, какие именно биологические процессы "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа (в нашем случае 5 тыс.). 
 
 В своём исследовании мы будем выявлять такие процессы, основываясь на оценке p-values гипергеометрического распределения, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
 где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
 
-В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости - мы в качестве порога будем использовать 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
 
 SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей.
 
@@ -1280,16 +1311,16 @@ imap_dfr(
 ```
 
 ```{r, echo=FALSE, eval=FALSE}
-hg_res_pq$rank_int_b2
-hg_res_pq$rank_int_ame0
-hg_res_pq$rank_int_ame1
+head(hg_res_pq$rank_int_b2)
+head(hg_res_pq$rank_int_ame0)
+head(hg_res_pq$rank_int_ame1)
 ```
 
 <br>
 
-Видим, что в моделях с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленным в каком-либо из наборов генов со значимыми различиями в экспрессии в какой-либо точке или в её динамике в зависимости от уровня ответа на вакцинацию. В моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди "значимых" (`r gsub("/", ", ", hg_res_pq$rank_int_b2$genes[1])`), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
+Видим, что в моделях с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленным в каком-либо из наборов генов со значимыми различиями в экспрессии в какой-либо точке или в её динамике в зависимости от уровня ответа на вакцинацию. В моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди значимых (`r gsub("/", ", ", hg_res_pq$rank_int_b2$genes[1])`), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
 
-Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (только в модели с рангами, для ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
+Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (модель с рангами, ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
 
 <br>
 

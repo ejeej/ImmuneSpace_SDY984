@@ -2,7 +2,7 @@
 title: '**ImmuneSpace: study SDY984**'
 subtitle: '**Genes expression under varicella zoster vaccine**'
 author: "Мироненко Ольга"
-date: "2023-01-04"
+date: "2023-01-05"
 output:
   html_document:
     code_folding: hide
@@ -140,14 +140,14 @@ bp_genesF <- function(df) {
   AnnotationDbi::select(
     org.Hs.eg.db::org.Hs.eg.db, 
     df %>% pull(gene) %>% unique(), 
-    c("GENENAME", "GO"), "SYMBOL") %>% 
+    "GO", "SYMBOL") %>% 
     filter(ONTOLOGY == "BP") %>%
-    mutate(TERM = AnnotationDbi::Term(GO)) %>%
-    filter(!is.na(TERM)) %>%
-    transmute(TERM, gene = SYMBOL) %>%
+    mutate(TERM = AnnotationDbi::Term(GO), DEFINITION = AnnotationDbi::Definition(GO)) %>%
+    filter(!is.na(TERM) & TERM != "biological_process") %>%
+    transmute(SYMBOL, GO, TERM, DEFINITION) %>%
     unique() %>%
     group_by(TERM) %>%
-    summarise(n = n(), genes = paste(gene, collapse = ", ")) %>%
+    summarise(GOBPID = unique(GO), def = unique(DEFINITION), n = n(), genes = paste(SYMBOL, collapse = ", ")) %>%
     arrange(-n)
 }
 
@@ -229,6 +229,10 @@ df_expr_long <- df_expr %>%
 - с помощью оценки различий в экспрессии генов между испытуемыми, ответившими и не ответившими на вакцинацию, 
 
 - с помощью оценки взаимосвязи между экспрессией генов (и её динамикой) и итоговым ответом на вакцинацию.
+
+<br>
+
+Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты генов-находок (генов с дифференциальной экспрессией для групп испытуемых с разной силой ответа на вакцинацию или генов, экспрессия которых окажется значимым образом связанной с ответом).
 
 <br>
 
@@ -522,8 +526,8 @@ mwtest_p <- suppressWarnings({df_expr_long_fin %>%
 genes_sig_mw <- AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, mwtest_p$gene[mwtest_p$p_adj < 0.05], 
                                       c("GENENAME", "GO"), "SYMBOL") %>% 
   filter(ONTOLOGY == "BP") %>%
-  mutate(TERM = AnnotationDbi::Term(GO)) %>%
-  transmute(gene = SYMBOL, TERM) %>%
+  mutate(TERM = AnnotationDbi::Term(GO), DEFINITION = AnnotationDbi::Definition(GO)) %>%
+  select(SYMBOL, GENENAME, TERM, DEFINITION) %>%
   unique()
 
 tbl_summary(
@@ -831,9 +835,9 @@ ggplot(df_expr_long_fin %>% filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05
 
 <br>
 
-[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это  ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2), участвующий в регулировании активности лейкоцитов, отвечающих за иммунитет. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): inflammatory response to antigenic stimulus; regulation of T cell tolerance induction; apoptotic process; activation-induced cell death of T cells; inflammatory response; immune response; cell surface receptor signaling pathway; Notch signaling pathway; interleukin-2-mediated signaling pathway; positive regulation of activated T cell proliferation; negative regulation of T cell proliferation; positive regulation of T cell differentiation; regulation of T cell homeostatic proliferation; negative regulation of inflammatory response.
+[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это NA ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2), участвующий в регулировании активности лейкоцитов, отвечающих за иммунитет. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): .
 
-[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это  ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): protein folding; positive regulation of cytosolic calcium ion concentration; synaptic transmission, cholinergic; protein localization to cell surface; cellular protein-containing complex assembly; positive regulation of protein localization to cell surface.
+[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это NA ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): .
 
 <br>
 
@@ -870,9 +874,9 @@ df_expr_long_fin <- df_expr_long_fin %>%
 
 - $expr_{ij}$ - экспрессия гена для _i_-го испытуемого в точке исследования _j_; оценим отдельно спецификации с:
 
-- исходными данными по экспрессии, 
+  - исходными данными по экспрессии, 
 
-- рангами генов по экспрессии, рассчитанными для каждого испытуемого в каждой точке исследования как квантиль эмпрической функции распределения экспрессий по всем генам для этого испытуемого в этой точке, 
+  - рангами генов по экспрессии, рассчитанными для каждого испытуемого в каждой точке исследования как квантиль эмпрической функции распределения экспрессий по всем генам для этого испытуемого в этой точке, 
 
 - $time_j$ - точка исследования (в днях от вакцинации), 
 
@@ -988,9 +992,9 @@ saveRDS(lmer_ames_int, "OlgaMironenko/res/lmer_ames_int.rds")
 
 <br>
 
-Всего получилось 414 генов в модели с исходными значениями для экспрессии и 386 гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
+Всего получилось 414 генов в модели с исходными значениями для экспрессии и 386 генов в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
 
-В регрессиях с эффектами пересечения обнарудилось 49 генов в модели с исходными значениями для экспрессии и 42 гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для 277 (260) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для 318 (337) генов в соответствующих моделях был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+В регрессиях с эффектами пересечения обнаружилось 49 генов в модели с исходными значениями для экспрессии и 42 гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для 277 (260) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для 318 (337) генов был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
 
 Ниже на графике покажем, насколько пересекаются наборы генов-находок, выявленных по статистической значимости коэффициентов в моделях с и без эффектов пересечения.
 
@@ -1014,7 +1018,7 @@ upset_plot(upset_plt_df, rev(colnames(upset_plt_df)[-1]),
 
 <br>
 
-Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value для соответствующего ATE < 0.05).
+Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value < 0.05 для соответствующего ATE).
 
 
 ```r
@@ -1056,7 +1060,7 @@ upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
 
 <br>
 
-Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения для каждого гена мы можем сопоставить соответствующие p-values - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
+Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения мы можем сопоставить соответствующие p-values для каждого гена - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
 
 
 ```r
@@ -1102,74 +1106,100 @@ ggplot(lmer_p_int_plt, aes(x = logp_b2, y = logp_b3)) +
 
 
 ```r
-bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2)) %>%
+t4 <- bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2))
+t4$GOBPID <- kableExtra::cell_spec(t4$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t4$GOBPID))
+
+t4 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 4. Biological processes (GO) for the most significant genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 4. Biological processes (GO) for genes with significant coefficients in linear mixed models, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 4. Biological processes (GO) for the most significant genes</b></caption>
+<caption style="font-size: initial !important;"><b>Table 4. Biological processes (GO) for genes with significant coefficients in linear mixed models, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 74 </td>
-   <td style="text-align:left;"> AHR, ALX4, ATP2B4, BCL6, BHLHE41, CARF, CUX2, DGKQ, DLX2, ELF3, ERG, FERD3L, FOSL1, HOPX, HOXB2, HOXB3, HOXD10, HOXD13, MAF, MEIS3P1, MNT, NEUROG1, NEUROG2, NFE2L2, NFIB, PAX6, POU3F1, RELB, RFX2, SCAND2P, SIX3, STOX2, TBL1Y, TBX1, TBX21, TBXT, TFAP2A, TFDP3, TLX2, TSC22D1, WT1, ZBTB43, ZBTB7C, ZFP30, ZHX2, ZKSCAN4, ZKSCAN7, ZNF124, ZNF155, ZNF16, ZNF232, ZNF260, ZNF285, ZNF391, ZNF396, ZNF439, ZNF440, ZNF519, ZNF557, ZNF575, ZNF578, ZNF582, ZNF585B, ZNF594, ZNF610, ZNF670, ZNF681, ZNF682, ZNF713, ZNF749, ZNF776, ZNF808, ZNF826P, ZNF83 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 74 </td>
+   <td style="text-align:left;vertical-align:top;"> AHR, ALX4, ATP2B4, BCL6, BHLHE41, CARF, CUX2, DGKQ, DLX2, ELF3, ERG, FERD3L, FOSL1, HOPX, HOXB2, HOXB3, HOXD10, HOXD13, MAF, MEIS3P1, MNT, NEUROG1, NEUROG2, NFE2L2, NFIB, PAX6, POU3F1, RELB, RFX2, SCAND2P, SIX3, STOX2, TBL1Y, TBX1, TBX21, TBXT, TFAP2A, TFDP3, TLX2, TSC22D1, WT1, ZBTB43, ZBTB7C, ZFP30, ZHX2, ZKSCAN4, ZKSCAN7, ZNF124, ZNF155, ZNF16, ZNF232, ZNF260, ZNF285, ZNF391, ZNF396, ZNF439, ZNF440, ZNF519, ZNF557, ZNF575, ZNF578, ZNF582, ZNF585B, ZNF594, ZNF610, ZNF670, ZNF681, ZNF682, ZNF713, ZNF749, ZNF776, ZNF808, ZNF826P, ZNF83 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 50 </td>
-   <td style="text-align:left;"> AKAP5, ANGPTL3, CCL2, CCL22, CCL4, CCN1, CD200R1, CEACAM6, CHRNA10, CHRNA3, CSF3R, CXCL16, CXCL5, CXCL9, EDA, ERAP2, ERFE, ERG, FAM13A, FAM3B, GNAL, GUCA2A, IL17D, IL3, ITGB1BP2, KIT, KLRK1, LILRB2, LTB, MAGI2, NLRP3, OCRL, PDE6C, PDE9A, PENK, PLCB1, PLPP1, PLPP3, RALA, RAPGEF3, RARA, RARB, RETN, SCGB3A1, SRGAP1, STX2, TBXT, TLR1, TNFSF8, TRAT1 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 50 </td>
+   <td style="text-align:left;vertical-align:top;"> AKAP5, ANGPTL3, CCL2, CCL22, CCL4, CCN1, CD200R1, CEACAM6, CHRNA10, CHRNA3, CSF3R, CXCL16, CXCL5, CXCL9, EDA, ERAP2, ERFE, ERG, FAM13A, FAM3B, GNAL, GUCA2A, IL17D, IL3, ITGB1BP2, KIT, KLRK1, LILRB2, LTB, MAGI2, NLRP3, OCRL, PDE6C, PDE9A, PENK, PLCB1, PLPP1, PLPP3, RALA, RAPGEF3, RARA, RARB, RETN, SCGB3A1, SRGAP1, STX2, TBXT, TLR1, TNFSF8, TRAT1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 49 </td>
-   <td style="text-align:left;"> AHR, ALX4, BMP2, BMPR1A, CCN1, CRTC2, DCN, DLL1, DLX2, EDN1, EIF5A, ELF3, ENG, ERG, FGFR2, HOXB2, HOXB3, HOXD10, HOXD13, IL2, IL4, JUP, LRP6, MAF, MEIS3P1, MYB, NDN, NEUROG1, NFE2L2, NFIB, NLRP3, PAX6, RARA, RARB, SIX3, STOX2, TBX1, TFAP2A, TLX2, TNFSF8, UHRF1, WT1, ZBTB38, ZBTB7C, ZFPM1, ZNF585B, ZNF593, ZNF594, ZNF808 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 49 </td>
+   <td style="text-align:left;vertical-align:top;"> AHR, ALX4, BMP2, BMPR1A, CCN1, CRTC2, DCN, DLL1, DLX2, EDN1, EIF5A, ELF3, ENG, ERG, FGFR2, HOXB2, HOXB3, HOXD10, HOXD13, IL2, IL4, JUP, LRP6, MAF, MEIS3P1, MYB, NDN, NEUROG1, NFE2L2, NFIB, NLRP3, PAX6, RARA, RARB, SIX3, STOX2, TBX1, TFAP2A, TLX2, TNFSF8, UHRF1, WT1, ZBTB38, ZBTB7C, ZFPM1, ZNF585B, ZNF593, ZNF594, ZNF808 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 45 </td>
-   <td style="text-align:left;"> AJUBA, BCL6, BHLHE41, BMP2, CRYM, CUX2, DACT1, DLX2, EDN1, FERD3L, FGFR2, HOPX, HOXB3, ID3, IFI27, IL4, MAF, MNT, MYB, NDN, NSMCE3, OTUD7B, PAX6, PRDM5, RARA, RARB, SKIL, SNCA, SOX14, TBX21, TBXT, TFAP2A, TRO, UHRF1, USP2, WT1, ZFPM1, ZHX2, ZNF124, ZNF391, ZNF439, ZNF440, ZNF557, ZNF582, ZNF749 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 45 </td>
+   <td style="text-align:left;vertical-align:top;"> AJUBA, BCL6, BHLHE41, BMP2, CRYM, CUX2, DACT1, DLX2, EDN1, FERD3L, FGFR2, HOPX, HOXB3, ID3, IFI27, IL4, MAF, MNT, MYB, NDN, NSMCE3, OTUD7B, PAX6, PRDM5, RARA, RARB, SKIL, SNCA, SOX14, TBX21, TBXT, TFAP2A, TRO, UHRF1, USP2, WT1, ZFPM1, ZHX2, ZNF124, ZNF391, ZNF439, ZNF440, ZNF557, ZNF582, ZNF749 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 31 </td>
-   <td style="text-align:left;"> ADAM12, ADGRE1, ADGRG1, AZGP1, CCL2, CCL4, CCN1, CCR1, CCR8, CD300A, CDH6, CEACAM1, CLDN23, CNTN2, CSF3R, DDR1, DST, EMP2, ENG, HAPLN1, HAPLN3, HAS1, IGFBP7, IGSF9B, IL2, ITGA9, NTM, OLFM4, PCDH12, PCDHB18P, SPON2 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 31 </td>
+   <td style="text-align:left;vertical-align:top;"> ADAM12, ADGRE1, ADGRG1, AZGP1, CCL2, CCL4, CCN1, CCR1, CCR8, CD300A, CDH6, CEACAM1, CLDN23, CNTN2, CSF3R, DDR1, DST, EMP2, ENG, HAPLN1, HAPLN3, HAS1, IGFBP7, IGSF9B, IL2, ITGA9, NTM, OLFM4, PCDH12, PCDHB18P, SPON2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 31 </td>
-   <td style="text-align:left;"> ADGRD1, ADGRE1, ADGRG1, ADORA2B, AKAP12, APOA1, ATRNL1, AVPR2, CCL2, CCL22, CCL4, CCL5, CCR8, CXCL9, DGKQ, EDN1, ENTPD2, F2R, FZD7, GPR157, GPR171, GPR22, KISS1R, NMUR1, OR51I2, OR5H1, OR5L2, PLCB1, PREX2, PTGDR, RHO </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 31 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRD1, ADGRE1, ADGRG1, ADORA2B, AKAP12, APOA1, ATRNL1, AVPR2, CCL2, CCL22, CCL4, CCL5, CCR8, CXCL9, DGKQ, EDN1, ENTPD2, F2R, FZD7, GPR157, GPR171, GPR22, KISS1R, NMUR1, OR51I2, OR5H1, OR5L2, PLCB1, PREX2, PTGDR, RHO </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 30 </td>
-   <td style="text-align:left;"> AZGP1, BMPR1A, CCL22, CCL4, CCR1, CCR8, CEACAM8, CST7, CTSG, CTSV, EDA, GZMA, HLA-DQB2, IL1R1, IL2, IL2RA, IL3, IL4, KIR3DL1, LILRB2, LTB, MICA, PDCD1LG2, PKHD1L1, PXDN, SERPINB9, TENM1, TLR1, TNFRSF4, ULBP1 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 30 </td>
+   <td style="text-align:left;vertical-align:top;"> AZGP1, BMPR1A, CCL22, CCL4, CCR1, CCR8, CEACAM8, CST7, CTSG, CTSV, EDA, GZMA, HLA-DQB2, IL1R1, IL2, IL2RA, IL3, IL4, KIR3DL1, LILRB2, LTB, MICA, PDCD1LG2, PKHD1L1, PXDN, SERPINB9, TENM1, TLR1, TNFRSF4, ULBP1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 29 </td>
-   <td style="text-align:left;"> AHR, BCL2, BCL2L15, BIK, BIRC5, CADM1, CD2, CDK1, CEACAM5, CEACAM6, CHEK1, FAM3B, FGFR2, GLRX2, GZMA, GZMB, GZMH, IFI27, IL2RA, NCKAP1, NLRP2, NLRP3, PAK6, PDCD1, PHLDA2, SERPINB9, SH3RF3, SNCA, TMEM14A </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 29 </td>
+   <td style="text-align:left;vertical-align:top;"> AHR, BCL2, BCL2L15, BIK, BIRC5, CADM1, CD2, CDK1, CEACAM5, CEACAM6, CHEK1, FAM3B, FGFR2, GLRX2, GZMA, GZMB, GZMH, IFI27, IL2RA, NCKAP1, NLRP2, NLRP3, PAK6, PDCD1, PHLDA2, SERPINB9, SH3RF3, SNCA, TMEM14A </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 29 </td>
-   <td style="text-align:left;"> AFAP1L2, BCL6, BMP2, CCL2, CCL22, CCL4, CCL5, CCR1, CHST2, CXCL5, CXCL9, ELF3, F2R, HRH4, IL17D, IL1R1, IL2RA, KIT, LXN, MEFV, MEP1B, NFE2L2, NLRP2, NLRP3, PTGDR, RELB, TAC4, TLR1, TNFRSF4 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 29 </td>
+   <td style="text-align:left;vertical-align:top;"> AFAP1L2, BCL6, BMP2, CCL2, CCL22, CCL4, CCL5, CCR1, CHST2, CXCL5, CXCL9, ELF3, F2R, HRH4, IL17D, IL1R1, IL2RA, KIT, LXN, MEFV, MEP1B, NFE2L2, NLRP2, NLRP3, PTGDR, RELB, TAC4, TLR1, TNFRSF4 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription, DNA-templated </td>
-   <td style="text-align:center;"> 28 </td>
-   <td style="text-align:left;"> AHR, BCL6, BHLHE41, BIRC5, BMP2, ELF3, FERD3L, GMNN, ID3, IL4, KCTD1, L3MBTL4, MYB, PLCB1, PRDM5, RARA, RELB, SCML2, SIX3, SOX14, TBL1Y, TBX21, TFAP2A, TNFRSF4, TNP1, WT1, ZBTB38, ZHX2 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription, DNA-templated </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045892" style="     ">GO:0045892</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cellular DNA-templated transcription. </td>
+   <td style="text-align:center;vertical-align:top;"> 28 </td>
+   <td style="text-align:left;vertical-align:top;"> AHR, BCL6, BHLHE41, BIRC5, BMP2, ELF3, FERD3L, GMNN, ID3, IL4, KCTD1, L3MBTL4, MYB, PLCB1, PRDM5, RARA, RELB, SCML2, SIX3, SOX14, TBL1Y, TBX21, TFAP2A, TNFRSF4, TNP1, WT1, ZBTB38, ZHX2 </td>
   </tr>
 </tbody>
 </table>
@@ -1180,7 +1210,7 @@ bp_genesF(lmer_sig_int %>% filter(sig_b3 | sig_b2)) %>%
 
 <br>
 
-Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего тритмент эффекта для ответа на вакцинацию с размером этого эффекта**. 
+Следующим шагом в анализе результатов оценки линейных смешанных моделей будет **сопоставление статистической значимости среднего эффекта ответа на вакцинацию с размером этого эффекта**. 
 
 Ниже представлен volcano plot для результатов оценки регрессий без эффектов пересечения, где по оси Y показано значение $-log_{10}$-преобразования p-value, а по оси X - оценка соответствующего коэффициента при переменной для ответа. Оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
 
@@ -1222,159 +1252,210 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = logp)) +
 
 <br>
 
-Опять же, с помощью базы Gene Ontology мы можем определить, в каких процессах участвуют биологические продукты генов с наименьшими и наибольшими значимыми (на 5%-ном уровне значимости) средними эффектами ответа (т.е. с наибольшей по абсолютной величине отрицательной и положительной разницей в средней экспрессии генов во всех точках между сильно и слабо ответившими на вакцинацию). Будем считать размер эффекта большим, если по абсолютной величине он превысит 0.25 для исходных данных по экспрессии (результаты для рангов здесь анализировать не будемп). Ниже в таблице представим результаты в виде перечня из 10 процессов, в которых участвует наибольшее число генов с большим отрицательным (downregulated - экспрессия/ ранг, в среднем, больше у слабо ответивших) и большим положительным (upregulated - экспрессия/ ранг, в среднем, больше у сильно ответивших) эффектами.
+Опять же, с помощью базы Gene Ontology мы можем определить, в каких процессах участвуют биологические продукты генов с наименьшими и наибольшими значимыми (на 5%-ном уровне значимости) средними эффектами ответа (т.е. с наибольшей по абсолютной величине отрицательной и положительной разницей в средней экспрессии генов во всех точках между сильно и слабо ответившими на вакцинацию). Будем считать размер эффекта большим, если по абсолютной величине он превысит 0.25 для исходных данных по экспрессии (результаты для рангов здесь анализировать не будем). Ниже в таблице представим результаты в виде перечня из 10 процессов, в которых участвует наибольшее число генов с большим отрицательным (downregulated - экспрессия, в среднем, больше у слабо ответивших) и большим положительным (upregulated - экспрессия, в среднем, больше у сильно ответивших) эффектами.
 
 
 ```r
-bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate > 0.25)) %>%
+t51 <- bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate > 0.25))
+t51$GOBPID <- kableExtra::cell_spec(t51$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t51$GOBPID))
+
+t51 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 5(1). Biological processes (GO) for the significant upregulated genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(1). Biological processes (GO) for significant upregulated genes, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 5(1). Biological processes (GO) for the significant upregulated genes</b></caption>
+<caption style="font-size: initial !important;"><b>Table 5(1). Biological processes (GO) for significant upregulated genes, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 17 </td>
-   <td style="text-align:left;"> ZNF681, RELB, ZNF786, IRX3, ZKSCAN4, BHLHE41, POU3F1, ZNF234, ZNF257, IKZF4, TSC22D1, ZNF814, ZNF502, ZNF594, GATA2, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 17 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF681, RELB, ZNF786, IRX3, ZKSCAN4, BHLHE41, POU3F1, ZNF234, ZNF257, IKZF4, TSC22D1, ZNF814, ZNF502, ZNF594, GATA2, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 9 </td>
-   <td style="text-align:left;"> ZNF786, RARB, IRX3, GTF2I, ZNF814, ZNF594, GATA2, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 9 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF786, RARB, IRX3, GTF2I, ZNF814, ZNF594, GATA2, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> RELB, CXCL9, HRH4, LXN, IL1R1, MEFV, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> RELB, CXCL9, HRH4, LXN, IL1R1, MEFV, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> RARB, IRX3, BHLHE41, GATA2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> RARB, IRX3, BHLHE41, GATA2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of cytosolic calcium ion concentration </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> HRH4, CHRNA10, GATA2, RIC3, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of cytosolic calcium ion concentration </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007204" style="     ">GO:0007204</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the concentration of calcium ions in the cytosol. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> HRH4, CHRNA10, GATA2, RIC3, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> RARB, CXCL9, ERFE, CHRNA10, SCGB3A1 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> RARB, CXCL9, ERFE, CHRNA10, SCGB3A1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> biological_process </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> HRH4, LHFPL2, THNSL1, CD248 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> PCDH12, ITGB8, CNTNAP2, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> PCDH12, ITGB8, CNTNAP2, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> P2RY14, CXCL9, TAS2R45, AKAP12 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> P2RY14, CXCL9, TAS2R45, AKAP12 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> HLA-DQB2, IL1R1, ITGB8, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> HLA-DQB2, IL1R1, ITGB8, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription, DNA-templated </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045892" style="     ">GO:0045892</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cellular DNA-templated transcription. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> RELB, BHLHE41, IKZF4, RUNX1T1 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
-bp_genesF(lmer_v_noint_plt %>%
-            filter(sig & expr == "Expression as is" & estimate < -0.25)) %>%
+t52 <- bp_genesF(lmer_v_noint_plt %>% filter(sig & expr == "Expression as is" & estimate < -0.25))
+t52$GOBPID <- kableExtra::cell_spec(t52$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t52$GOBPID))
+
+t52 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 5(2). Biological processes (GO) for the significant downregulated genes</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 5(2). Biological processes (GO) for significant downregulated genes, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 5(2). Biological processes (GO) for the significant downregulated genes</b></caption>
+<caption style="font-size: initial !important;"><b>Table 5(2). Biological processes (GO) for significant downregulated genes, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> OLFM4, NUAK1, ADGRG1, CCL4, SPON2 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> OLFM4, NUAK1, ADGRG1, CCL4, SPON2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> ZNF683, SCAND2P, TBX21, TLX2, ZNF391 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF683, SCAND2P, TBX21, TLX2, ZNF391 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> spermatogenesis </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> CADM1, TDRD1, SLCO4C1, SERPINA5 </td>
+   <td style="text-align:left;vertical-align:top;"> spermatogenesis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007283" style="     ">GO:0007283</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The developmental process by which male germ line stem cells self renew or give rise to successive cell types resulting in the development of a spermatozoa. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> CADM1, TDRD1, SLCO4C1, SERPINA5 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> GZMH, GZMB, CADM1 </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> GZMH, GZMB, CADM1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> biological_process </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> SCAND2P, VMO1, TSPOAP1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell-cell signaling </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007267" style="     ">GO:0007267</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that mediates the transfer of information from one cell to another. This process includes signal transduction in the receiving cell and, where applicable, release of a ligand and any processes that actively facilitate its transport and presentation to the receiving cell.  Examples include signaling via soluble ligands, via cell adhesion molecules and via gap junctions. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, FGFBP2, CCL4 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell-cell signaling </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> ADGRG1, FGFBP2, CCL4 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> OR5L2, ADGRG1, CCL4 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> OR5L2, ADGRG1, CCL4 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> JUP, ADRB2, TLX2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> JUP, ADRB2, TLX2 </td>
+   <td style="text-align:left;vertical-align:top;"> protein transport </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0015031" style="     ">GO:0015031</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The directed movement of proteins into, out of or within a cell, or between cells, by means of some agent such as a transporter or pore. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> AGAP1, SERP2, LRP2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> protein transport </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> AGAP1, SERP2, LRP2 </td>
+   <td style="text-align:left;vertical-align:top;"> proteolysis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006508" style="     ">GO:0006508</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The hydrolysis of proteins into smaller polypeptides and/or amino acids by cleavage of their peptide bonds. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> GZMH, PRSS23, VASH1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> proteolysis </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> GZMH, PRSS23, VASH1 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL4, GNAL, AKAP5 </td>
   </tr>
 </tbody>
 </table>
 
 <br>
 
-Аналогичные графики и таблицы можно построить и для оценки **среднего тритмент эффекта для ответа в отдельных точках исследования**, используя результаты для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки коэффициента.
+Аналогичные графики и таблицы можно построить и для оценки **среднего эффекта ответа в отдельных точках исследования**, используя результаты для регрессий с эффектами пересечения. На каждом графике оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями оценки ATE.
 
 
 ```r
@@ -1421,612 +1502,804 @@ ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
 
 <br>
 
-И таблицы по 10 upregulated и downregulated биологических процессов в каждой точке исследования, определённых аналогично описанному выше принципу (по размеру эффекта для исходных данных по экспрессии):
+И таблицы по 10 биологических процессов, в которых участвуют продукты up- и downregulated генов в каждой точке исследования (с большими положительными и отрицательными значениями среднего эффекта, соответственно):
 
 
 ```r
 t61 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate > 0.25))
+t61$GOBPID <- kableExtra::cell_spec(t61$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t61$GOBPID))
 
 t61 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(1). Biological processes (GO) for the significant upregulated genes, Baseline</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(1). Biological processes (GO) for significant upregulated genes, Baseline, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(1). Biological processes (GO) for the significant upregulated genes, Baseline</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(1). Biological processes (GO) for significant upregulated genes, Baseline, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 13 </td>
-   <td style="text-align:left;"> PAX6, ZBTB43, ZNF575, MNT, ZNF124, TSC22D1, BCL6, ZKSCAN4, RELB, RFX2, HOXB2, ZNF594, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 13 </td>
+   <td style="text-align:left;vertical-align:top;"> PAX6, ZBTB43, ZNF575, MNT, ZNF124, TSC22D1, BCL6, ZKSCAN4, RELB, RFX2, HOXB2, ZNF594, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 12 </td>
-   <td style="text-align:left;"> CCL22, CCL2, CHRNA10, RARA, CSF3R, RARB, PDE9A, CXCL9, NLRP3, ERFE, KIT, SCGB3A1 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 12 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL22, CCL2, CHRNA10, RARA, CSF3R, RARB, PDE9A, CXCL9, NLRP3, ERFE, KIT, SCGB3A1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> CCL22, CCL2, BCL6, MEFV, RELB, CXCL9, NLRP3, CCR1, KIT, IL1R1 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL22, CCL2, BCL6, MEFV, RELB, CXCL9, NLRP3, CCR1, KIT, IL1R1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> PAX6, MNT, ID3, ZNF124, BCL6, RARA, RARB, EDN1, HOXB3, IFI27 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> PAX6, MNT, ID3, ZNF124, BCL6, RARA, RARB, EDN1, HOXB3, IFI27 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 9 </td>
-   <td style="text-align:left;"> PAX6, EIF5A, RARA, RARB, NLRP3, EDN1, HOXB2, ZNF594, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 9 </td>
+   <td style="text-align:left;vertical-align:top;"> PAX6, EIF5A, RARA, RARB, NLRP3, EDN1, HOXB2, ZNF594, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> innate immune response </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> MEFV, RELB, SERPING1, TREM1, NLRP3, ARG2, IFI27 </td>
+   <td style="text-align:left;vertical-align:top;"> innate immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Innate immune responses are defense responses mediated by germline encoded components that directly recognize components of potential pathogens. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> MEFV, RELB, SERPING1, TREM1, NLRP3, ARG2, IFI27 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adaptive immune response </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> HLA-DQB2, TNFRSF13C, TREM1, LAMP3, ARG2, LILRA3 </td>
+   <td style="text-align:left;vertical-align:top;"> adaptive immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002250" style="     ">GO:0002250</a> </td>
+   <td style="text-align:left;vertical-align:top;"> An immune response mediated by cells expressing specific receptors for antigen produced through a somatic diversification process, and allowing for an enhanced secondary response to subsequent exposures to the same antigen (immunological memory). </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> HLA-DQB2, TNFRSF13C, TREM1, LAMP3, ARG2, LILRA3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> CCL2, CLDN23, CSF3R, PCDHB18P, PCDH12, CCR1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL2, CLDN23, CSF3R, PCDHB18P, PCDH12, CCR1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell differentiation </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> ID3, RARA, DLK1, NKAPL, SPATA20, RARB </td>
+   <td style="text-align:left;vertical-align:top;"> cell differentiation </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0030154" style="     ">GO:0030154</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which relatively unspecialized cells, e.g. embryonic or regenerative cells, acquire specialized structural and/or functional features that characterize the cells, tissues, or organs of the mature organism or some other relatively stable phase of the organism's life history. Differentiation includes the processes involved in commitment of a cell to a specific fate and its subsequent development to the mature state. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> ID3, RARA, DLK1, NKAPL, SPATA20, RARB </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of cell population proliferation </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> MNT, H2AC4, BCL6, RARA, NUPR1, RARB </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of cell population proliferation </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0008285" style="     ">GO:0008285</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents or reduces the rate or extent of cell proliferation. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> MNT, H2AC4, BCL6, RARA, NUPR1, RARB </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t62 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate > 0.25))
+t62$GOBPID <- kableExtra::cell_spec(t62$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t62$GOBPID))
 
 t62 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(2). Biological processes (GO) for the significant upregulated genes, 1 day</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(2). Biological processes (GO) for significant upregulated genes, 1 day, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(2). Biological processes (GO) for the significant upregulated genes, 1 day</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(2). Biological processes (GO) for significant upregulated genes, 1 day, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 9 </td>
-   <td style="text-align:left;"> BHLHE41, ZNF575, TSC22D1, ZKSCAN4, RELB, RFX2, ZNF594, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 9 </td>
+   <td style="text-align:left;vertical-align:top;"> BHLHE41, ZNF575, TSC22D1, ZKSCAN4, RELB, RFX2, ZNF594, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 9 </td>
-   <td style="text-align:left;"> CSF3R, CHRNA10, RARB, PDE9A, CXCL9, NLRP3, KIT, ERFE, SCGB3A1 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 9 </td>
+   <td style="text-align:left;vertical-align:top;"> CSF3R, CHRNA10, RARB, PDE9A, CXCL9, NLRP3, KIT, ERFE, SCGB3A1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 8 </td>
-   <td style="text-align:left;"> RELB, MEFV, CXCL9, NLRP3, KIT, CCR1, IL1R1, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 8 </td>
+   <td style="text-align:left;vertical-align:top;"> RELB, MEFV, CXCL9, NLRP3, KIT, CCR1, IL1R1, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> innate immune response </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> TREM1, SERPING1, RELB, MEFV, NLRP3, ARG2, IFI27 </td>
+   <td style="text-align:left;vertical-align:top;"> innate immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Innate immune responses are defense responses mediated by germline encoded components that directly recognize components of potential pathogens. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> TREM1, SERPING1, RELB, MEFV, NLRP3, ARG2, IFI27 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adaptive immune response </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> TNFRSF13C, HLA-DQB2, TREM1, LAMP3, ARG2, LILRA3 </td>
+   <td style="text-align:left;vertical-align:top;"> adaptive immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002250" style="     ">GO:0002250</a> </td>
+   <td style="text-align:left;vertical-align:top;"> An immune response mediated by cells expressing specific receptors for antigen produced through a somatic diversification process, and allowing for an enhanced secondary response to subsequent exposures to the same antigen (immunological memory). </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> TNFRSF13C, HLA-DQB2, TREM1, LAMP3, ARG2, LILRA3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> CSF3R, PCDHB18P, PCDH12, CNTNAP2, CCR1, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> CSF3R, PCDHB18P, PCDH12, CNTNAP2, CCR1, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> RARB, NLRP3, EDN1, ZNF594, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> RARB, NLRP3, EDN1, ZNF594, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> BHLHE41, RARB, EDN1, HOXB3, IFI27 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> BHLHE41, RARB, EDN1, HOXB3, IFI27 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of cytosolic calcium ion concentration </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> RIC3, CHRNA10, EDN1, CCR1, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of cytosolic calcium ion concentration </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007204" style="     ">GO:0007204</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the concentration of calcium ions in the cytosol. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> RIC3, CHRNA10, EDN1, CCR1, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> calcium-mediated signaling </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> GRIN2C, EDN1, CCR1, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> calcium-mediated signaling </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0019722" style="     ">GO:0019722</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any intracellular signal transduction in which the signal is passed on within the cell via calcium ions. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> GRIN2C, EDN1, CCR1, CCR3 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t63 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate > 0.25))
+t63$GOBPID <- kableExtra::cell_spec(t63$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t63$GOBPID))
 
 t63 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(3). Biological processes (GO) for the significant upregulated genes, 3 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(3). Biological processes (GO) for significant upregulated genes, 3 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(3). Biological processes (GO) for the significant upregulated genes, 3 days</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(3). Biological processes (GO) for significant upregulated genes, 3 days, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 17 </td>
-   <td style="text-align:left;"> ZKSCAN7, ZKSCAN4, ZNF786, IRX3, ZNF681, BHLHE41, POU3F1, ZNF234, ZNF257, IKZF4, TSC22D1, ZNF814, ZNF594, ZNF502, GATA2, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 17 </td>
+   <td style="text-align:left;vertical-align:top;"> ZKSCAN7, ZKSCAN4, ZNF786, IRX3, ZNF681, BHLHE41, POU3F1, ZNF234, ZNF257, IKZF4, TSC22D1, ZNF814, ZNF594, ZNF502, GATA2, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 8 </td>
-   <td style="text-align:left;"> ZNF786, IRX3, GTF2I, ZNF814, ZNF594, GATA2, HOXB2, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 8 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF786, IRX3, GTF2I, ZNF814, ZNF594, GATA2, HOXB2, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> CXCL9, HRH4, CCR1, LXN, IL1R1, MEFV, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> CXCL9, HRH4, CCR1, LXN, IL1R1, MEFV, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of cytosolic calcium ion concentration </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> HRH4, CCR1, CHRNA10, GATA2, RIC3, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of cytosolic calcium ion concentration </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007204" style="     ">GO:0007204</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the concentration of calcium ions in the cytosol. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> HRH4, CCR1, CHRNA10, GATA2, RIC3, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> CCR1, ITGB8, CNTNAP2, CCR3, FOLR3 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> CCR1, ITGB8, CNTNAP2, CCR3, FOLR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> HLA-DQB2, CCR1, IL1R1, ITGB8, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> HLA-DQB2, CCR1, IL1R1, ITGB8, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> IRX3, BHLHE41, GATA2, IFI27, HOXB3 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> IRX3, BHLHE41, GATA2, IFI27, HOXB3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adaptive immune response </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> HLA-DQB2, ARG2, LAMP3, LILRA3 </td>
+   <td style="text-align:left;vertical-align:top;"> adaptive immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002250" style="     ">GO:0002250</a> </td>
+   <td style="text-align:left;vertical-align:top;"> An immune response mediated by cells expressing specific receptors for antigen produced through a somatic diversification process, and allowing for an enhanced secondary response to subsequent exposures to the same antigen (immunological memory). </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> HLA-DQB2, ARG2, LAMP3, LILRA3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> biological_process </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> HRH4, LHFPL2, THNSL1, CD248 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> CXCL9, P2RY14, TAS2R45, AKAP12 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> CXCL9, P2RY14, TAS2R45, AKAP12 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of gene expression </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010628" style="     ">GO:0010628</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> POU3F1, LAMP3, GATA2, ITGB8 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t64 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate > 0.25))
+t64$GOBPID <- kableExtra::cell_spec(t64$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t64$GOBPID))
 
 t64 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(4). Biological processes (GO) for the significant upregulated genes, 7 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(4). Biological processes (GO) for significant upregulated genes, 7 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(4). Biological processes (GO) for the significant upregulated genes, 7 days</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(4). Biological processes (GO) for significant upregulated genes, 7 days, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 40 </td>
-   <td style="text-align:left;"> HIVEP2, PCGF6, ZNF268, ZNF776, ZFP37, ZNF585B, ZNF223, ZNF154, ZNF302, ZNF852, ZHX2, ZNF107, ZNF682, ZNF232, ZNF175, BHLHE41, ZNF630, ZNF670, TSC22D1, ZSCAN26, ZNF578, USF1, ZNF717, ZNF786, MEIS3P1, POU3F1, ZNF439, ZNF826P, ZNF814, ZNF285, ZNF260, IKZF4, CARF, ZNF502, GATA2, ZNF519, ZKSCAN7, ZNF681, HOXB3, HOXB2 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 40 </td>
+   <td style="text-align:left;vertical-align:top;"> HIVEP2, PCGF6, ZNF268, ZNF776, ZFP37, ZNF585B, ZNF223, ZNF154, ZNF302, ZNF852, ZHX2, ZNF107, ZNF682, ZNF232, ZNF175, BHLHE41, ZNF630, ZNF670, TSC22D1, ZSCAN26, ZNF578, USF1, ZNF717, ZNF786, MEIS3P1, POU3F1, ZNF439, ZNF826P, ZNF814, ZNF285, ZNF260, IKZF4, CARF, ZNF502, GATA2, ZNF519, ZKSCAN7, ZNF681, HOXB3, HOXB2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 17 </td>
-   <td style="text-align:left;"> ZNF268, ZNF585B, TNFSF8, ZNF107, ZNF175, GTF2I, NDN, USF1, MYB, ZNF717, ZNF786, MEIS3P1, PLAG1, ZNF814, GATA2, HOXB3, HOXB2 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 17 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF268, ZNF585B, TNFSF8, ZNF107, ZNF175, GTF2I, NDN, USF1, MYB, ZNF717, ZNF786, MEIS3P1, PLAG1, ZNF814, GATA2, HOXB3, HOXB2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 15 </td>
-   <td style="text-align:left;"> PCGF6, ZNF268, AEBP1, ZFP37, AJUBA, ZHX2, ZNF175, BHLHE41, NDN, MYB, ZNF439, PAWR, GATA2, HOXB3, DACT1 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 15 </td>
+   <td style="text-align:left;vertical-align:top;"> PCGF6, ZNF268, AEBP1, ZFP37, AJUBA, ZHX2, ZNF175, BHLHE41, NDN, MYB, ZNF439, PAWR, GATA2, HOXB3, DACT1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 13 </td>
-   <td style="text-align:left;"> IL7R, THNSL2, TRAT1, SIGLEC8, PLPP1, TNFSF14, RAP1GAP, WNT8B, TNFSF8, LTB, SAV1, CHRNA10, STX2 </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 13 </td>
+   <td style="text-align:left;vertical-align:top;"> IL7R, THNSL2, TRAT1, SIGLEC8, PLPP1, TNFSF14, RAP1GAP, WNT8B, TNFSF8, LTB, SAV1, CHRNA10, STX2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> biological_process </td>
-   <td style="text-align:center;"> 12 </td>
-   <td style="text-align:left;"> OXNAD1, THNSL2, TSPAN9, ZNF223, BTNL3, ZNF107, URB1, NUDT7, HRH4, PUDP, CD248, THNSL1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> PDZD2, SIGLEC8, PTPRU, CNTN2, HAPLN3, PARD3, ITGB8, CNTNAP2, CCR3, FOLR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> PDZD2, SIGLEC8, PTPRU, CNTN2, HAPLN3, PARD3, ITGB8, CNTNAP2, CCR3, FOLR3 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> IL7R, TNFSF14, LTB, ICOS, TLR10, TNFRSF4, IL2RA, ITGB8, CD24, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> IL7R, TNFSF14, LTB, ICOS, TLR10, TNFRSF4, IL2RA, ITGB8, CD24, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> inflammatory response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006954" style="     ">GO:0006954</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The immediate defensive reaction (by vertebrate tissue) to infection or injury caused by chemical or physical agents. The process is characterized by local vasodilation, extravasation of plasma into intercellular spaces and accumulation of white blood cells and macrophages. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> CHST1, TPST1, HRH4, TLR10, MEFV, TNFRSF4, NLRP2, LXN, IL2RA, CCR3 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> inflammatory response </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> CHST1, TPST1, HRH4, TLR10, MEFV, TNFRSF4, NLRP2, LXN, IL2RA, CCR3 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of gene expression </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010628" style="     ">GO:0010628</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> IL7R, SEC16B, JPX, TMEM119, PLAG1, POU3F1, AVPR2, PAWR, GATA2, ITGB8 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of gene expression </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> IL7R, SEC16B, JPX, TMEM119, PLAG1, POU3F1, AVPR2, PAWR, GATA2, ITGB8 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription, DNA-templated </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006355" style="     ">GO:0006355</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of cellular DNA-templated transcription. </td>
+   <td style="text-align:center;vertical-align:top;"> 10 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF268, ZFP37, AJUBA, ZNF682, ZSCAN26, MYB, PLAG1, ZNF826P, ZNF502, ZNF519 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of transcription, DNA-templated </td>
-   <td style="text-align:center;"> 10 </td>
-   <td style="text-align:left;"> ZNF268, ZFP37, AJUBA, ZNF682, ZSCAN26, MYB, PLAG1, ZNF826P, ZNF502, ZNF519 </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 9 </td>
+   <td style="text-align:left;vertical-align:top;"> PIM2, BCL2, TNFSF14, CASP10, SAV1, ALOX15B, PAWR, NLRP2, IL2RA </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t65 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame0" & sig & expr == "Expression as is" & estimate < -0.25))
+t65$GOBPID <- kableExtra::cell_spec(t65$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t65$GOBPID))
 
 t65 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(5). Biological processes (GO) for the significant downregulated genes, Baseline</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(5). Biological processes (GO) for significant downregulated genes, Baseline, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(5). Biological processes (GO) for the significant downregulated genes, Baseline</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(5). Biological processes (GO) for significant downregulated genes, Baseline, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> GZMH, NLRP2, GZMB, CADM1, CDK1, NCKAP1, BCL2L15 </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> GZMH, NLRP2, GZMB, CADM1, CDK1, NCKAP1, BCL2L15 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> CCL4, OR5L2, ADGRG1, PTGDR, ADGRE1, DGKQ </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL4, OR5L2, ADGRG1, PTGDR, ADGRE1, DGKQ </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> SCAND2P, NFIB, ZNF83, TBX21, DGKQ, ZNF391 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> SCAND2P, NFIB, ZNF83, TBX21, DGKQ, ZNF391 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> OLFM4, CCL4, ADGRG1, ADGRE1, SPON2 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> OLFM4, CCL4, ADGRG1, ADGRE1, SPON2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of gene expression </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> MMP8, CDK1, DGKQ, DRD1, RNF207 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of gene expression </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010628" style="     ">GO:0010628</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> MMP8, CDK1, DGKQ, DRD1, RNF207 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> proteolysis </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> MMP8, LTF, GZMH, ERAP2, VASH1 </td>
+   <td style="text-align:left;vertical-align:top;"> proteolysis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006508" style="     ">GO:0006508</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The hydrolysis of proteins into smaller polypeptides and/or amino acids by cleavage of their peptide bonds. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> MMP8, LTF, GZMH, ERAP2, VASH1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> CCL4, ERAP2, RETN, AKAP5, GNAL </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> CCL4, ERAP2, RETN, AKAP5, GNAL </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> ADGRG1, S1PR5, ADGRE1, DRD1 </td>
+   <td style="text-align:left;vertical-align:top;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007189" style="     ">GO:0007189</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The series of molecular signals generated as a consequence of a G protein-coupled receptor binding to its physiological ligand, where the pathway proceeds through activation of adenylyl cyclase activity and a subsequent increase in the concentration of cyclic AMP (cAMP). </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, S1PR5, ADGRE1, DRD1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell migration </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> JUP, ADGRG1, CDK1, NCKAP1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell migration </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0016477" style="     ">GO:0016477</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The controlled self-propelled movement of a cell from one site to a destination guided by molecular cues. Cell migration is a central process in the development and maintenance of multicellular organisms. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> JUP, ADGRG1, CDK1, NCKAP1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> CEACAM8, CCL4, KIR3DL1, TENM1 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> CEACAM8, CCL4, KIR3DL1, TENM1 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t66 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame1" & sig & expr == "Expression as is" & estimate < -0.25))
+t66$GOBPID <- kableExtra::cell_spec(t66$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t66$GOBPID))
 
 t66 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(6). Biological processes (GO) for the significant downregulated genes, 1 day</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(6). Biological processes (GO) for significant downregulated genes, 1 day, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(6). Biological processes (GO) for the significant downregulated genes, 1 day</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(6). Biological processes (GO) for significant downregulated genes, 1 day, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> GZMH, GZMB, CADM1, NLRP2, CDK1, BCL2L15 </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> GZMH, GZMB, CADM1, NLRP2, CDK1, BCL2L15 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> OLFM4, NUAK1, CCL4, ADGRG1, SPON2, ADGRE1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> OLFM4, NUAK1, CCL4, ADGRG1, SPON2, ADGRE1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> OR5L2, CCL4, ADGRG1, PTGDR, ADGRE1, DGKQ </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> OR5L2, CCL4, ADGRG1, PTGDR, ADGRE1, DGKQ </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> SCAND2P, TBX21, ZNF683, ZNF83, DGKQ, ZNF391 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> SCAND2P, TBX21, ZNF683, ZNF83, DGKQ, ZNF391 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> innate immune response </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> RNASE3, ZNF683, NLRP2, SPON2, SH2D1B </td>
+   <td style="text-align:left;vertical-align:top;"> innate immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Innate immune responses are defense responses mediated by germline encoded components that directly recognize components of potential pathogens. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> RNASE3, ZNF683, NLRP2, SPON2, SH2D1B </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of gene expression </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> MMP8, SLC24A3, CDK1, DGKQ, DRD1 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of gene expression </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010628" style="     ">GO:0010628</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> MMP8, SLC24A3, CDK1, DGKQ, DRD1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> ADGRG1, S1PR5, ADGRE1, DRD1 </td>
+   <td style="text-align:left;vertical-align:top;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007189" style="     ">GO:0007189</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The series of molecular signals generated as a consequence of a G protein-coupled receptor binding to its physiological ligand, where the pathway proceeds through activation of adenylyl cyclase activity and a subsequent increase in the concentration of cyclic AMP (cAMP). </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, S1PR5, ADGRE1, DRD1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> CEACAM8, CCL4, KIR3DL1, TENM1 </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> CEACAM8, CCL4, KIR3DL1, TENM1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of gene expression </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> MMP8, SLC24A3, CDK1, DGKQ </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of gene expression </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010629" style="     ">GO:0010629</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that decreases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> MMP8, SLC24A3, CDK1, DGKQ </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> proteolysis </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> MMP8, GZMH, PRSS23, VASH1 </td>
+   <td style="text-align:left;vertical-align:top;"> proteolysis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006508" style="     ">GO:0006508</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The hydrolysis of proteins into smaller polypeptides and/or amino acids by cleavage of their peptide bonds. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> MMP8, GZMH, PRSS23, VASH1 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t67 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame3" & sig & expr == "Expression as is" & estimate < -0.25))
+t67$GOBPID <- kableExtra::cell_spec(t67$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t67$GOBPID))
 
 t67 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(7). Biological processes (GO) for the significant downregulated genes, 3 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(7). Biological processes (GO) for significant downregulated genes, 3 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(7). Biological processes (GO) for the significant downregulated genes, 3 days</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(7). Biological processes (GO) for significant downregulated genes, 3 days, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> cell adhesion </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> OLFM4, NUAK1, ADGRG1, CCL4, SPON2 </td>
+   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> OLFM4, NUAK1, ADGRG1, CCL4, SPON2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> ZNF683, SCAND2P, TBX21, TLX2, ZNF391 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF683, SCAND2P, TBX21, TLX2, ZNF391 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> ADGRG1, OR5L2, CCL4, ADGRG5 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, OR5L2, CCL4, ADGRG5 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> spermatogenesis </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:left;"> CADM1, TDRD1, SERPINA5, SLCO4C1 </td>
+   <td style="text-align:left;vertical-align:top;"> spermatogenesis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007283" style="     ">GO:0007283</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The developmental process by which male germ line stem cells self renew or give rise to successive cell types resulting in the development of a spermatozoa. </td>
+   <td style="text-align:center;vertical-align:top;"> 4 </td>
+   <td style="text-align:left;vertical-align:top;"> CADM1, TDRD1, SERPINA5, SLCO4C1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> ADGRG1, S1PR5, ADGRG5 </td>
+   <td style="text-align:left;vertical-align:top;"> adenylate cyclase-activating G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007189" style="     ">GO:0007189</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The series of molecular signals generated as a consequence of a G protein-coupled receptor binding to its physiological ligand, where the pathway proceeds through activation of adenylyl cyclase activity and a subsequent increase in the concentration of cyclic AMP (cAMP). </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, S1PR5, ADGRG5 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> GZMH, GZMB, CADM1 </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> GZMH, GZMB, CADM1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> biological_process </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> SCAND2P, VMO1, TSPOAP1 </td>
+   <td style="text-align:left;vertical-align:top;"> cell-cell signaling </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007267" style="     ">GO:0007267</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that mediates the transfer of information from one cell to another. This process includes signal transduction in the receiving cell and, where applicable, release of a ligand and any processes that actively facilitate its transport and presentation to the receiving cell.  Examples include signaling via soluble ligands, via cell adhesion molecules and via gap junctions. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, FGFBP2, CCL4 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell-cell signaling </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> ADGRG1, FGFBP2, CCL4 </td>
+   <td style="text-align:left;vertical-align:top;"> cell surface receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007166" style="     ">GO:0007166</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals initiated by activation of a receptor on the surface of a cell. The pathway begins with binding of an extracellular ligand to a cell surface receptor, or for receptors that signal in the absence of a ligand, by ligand-withdrawal or the activity of a constitutively active receptor. The pathway ends with regulation of a downstream cellular process, e.g. transcription. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> ADGRG1, ADRB2, ADGRG5 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> cell surface receptor signaling pathway </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> ADGRG1, ADRB2, ADGRG5 </td>
+   <td style="text-align:left;vertical-align:top;"> innate immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Innate immune responses are defense responses mediated by germline encoded components that directly recognize components of potential pathogens. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> ZNF683, LILRA4, SPON2 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> innate immune response </td>
-   <td style="text-align:center;"> 3 </td>
-   <td style="text-align:left;"> ZNF683, LILRA4, SPON2 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 3 </td>
+   <td style="text-align:left;vertical-align:top;"> TBX21, ZNF391, USP2 </td>
   </tr>
 </tbody>
 </table>
 
 ```r
 t68 <- bp_genesF(lmer_v_int_plt %>% filter(term == "ame7" & sig & expr == "Expression as is" & estimate < -0.25))
+t68$GOBPID <- kableExtra::cell_spec(t68$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t68$GOBPID))
 
 t68 %>%
   head(10) %>%
-  kable(align = "lcl", col.names = c("BP (GO term)", "N, sig.genes", "Sig.genes"), 
-        caption = "<b>Table 6(8). Biological processes (GO) for the significant downregulated genes, 7 days</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes", "Sig.genes"), 
+        caption = "<b>Table 6(8). Biological processes (GO) for significant downregulated genes, 7 days, top 10 by gene count</b>") %>% 
+  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
+  kableExtra::column_spec(1:5, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
 ```
 
 <table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6(8). Biological processes (GO) for the significant downregulated genes, 7 days</b></caption>
+<caption style="font-size: initial !important;"><b>Table 6(8). Biological processes (GO) for significant downregulated genes, 7 days, top 10 by gene count</b></caption>
  <thead>
   <tr>
-   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;"> N, sig.genes </th>
-   <th style="text-align:left;font-weight: bold;"> Sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
+   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
+   <th style="text-align:left;font-weight: bold;text-align: center;"> Sig.genes </th>
   </tr>
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:left;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 12 </td>
-   <td style="text-align:left;"> ZFY, CREB3L3, ZNF683, TLX2, ZFP57, ZNF440, ZNF749, TBX1, VSX1, FOXG1, NEUROG1, ZNF613 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 12 </td>
+   <td style="text-align:left;vertical-align:top;"> ZFY, CREB3L3, ZNF683, TLX2, ZFP57, ZNF440, ZNF749, TBX1, VSX1, FOXG1, NEUROG1, ZNF613 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> signal transduction </td>
-   <td style="text-align:center;"> 8 </td>
-   <td style="text-align:left;"> GUCA2A, ADCY8, TNFSF15, ANGPTL3, CCL2, CCN1, IL3, ZYX </td>
+   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
+   <td style="text-align:center;vertical-align:top;"> 8 </td>
+   <td style="text-align:left;vertical-align:top;"> GUCA2A, ADCY8, TNFSF15, ANGPTL3, CCL2, CCN1, IL3, ZYX </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of apoptotic process </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> SERPINB9, CCN1, CEACAM5, HMGA2, LRP2, IL7, PRAMEF12 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0043066" style="     ">GO:0043066</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cell death by apoptotic process. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> SERPINB9, CCN1, CEACAM5, HMGA2, LRP2, IL7, PRAMEF12 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> ZFP57, ZNF440, USP2, ZNF749, SKIL, HMGA2, FOXG1 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> ZFP57, ZNF440, USP2, ZNF749, SKIL, HMGA2, FOXG1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;"> 7 </td>
-   <td style="text-align:left;"> CREB3L3, TLX2, TBX1, CCN1, HMGA2, IL1A, NEUROG1 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
+   <td style="text-align:center;vertical-align:top;"> 7 </td>
+   <td style="text-align:left;vertical-align:top;"> CREB3L3, TLX2, TBX1, CCN1, HMGA2, IL1A, NEUROG1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> CTSV, SERPINB9, TNFSF15, IL3, PDCD1LG2, IL1A </td>
+   <td style="text-align:left;vertical-align:top;"> immune response </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> CTSV, SERPINB9, TNFSF15, IL3, PDCD1LG2, IL1A </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> spermatogenesis </td>
-   <td style="text-align:center;"> 6 </td>
-   <td style="text-align:left;"> USP9Y, CTSV, SERPINA5, SKIL, H1-1, RAD51C </td>
+   <td style="text-align:left;vertical-align:top;"> spermatogenesis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007283" style="     ">GO:0007283</a> </td>
+   <td style="text-align:left;vertical-align:top;"> The developmental process by which male germ line stem cells self renew or give rise to successive cell types resulting in the development of a spermatozoa. </td>
+   <td style="text-align:center;vertical-align:top;"> 6 </td>
+   <td style="text-align:left;vertical-align:top;"> USP9Y, CTSV, SERPINA5, SKIL, H1-1, RAD51C </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> angiogenesis </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> ANGPTL3, TBX1, APOD, CCL2, EPHB1 </td>
+   <td style="text-align:left;vertical-align:top;"> angiogenesis </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0001525" style="     ">GO:0001525</a> </td>
+   <td style="text-align:left;vertical-align:top;"> Blood vessel formation when new vessels emerge from the proliferation of pre-existing blood vessels. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> ANGPTL3, TBX1, APOD, CCL2, EPHB1 </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> apoptotic process </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> SERPINB9, TNFSF15, STEAP3, CEACAM5, IL1A </td>
+   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> SERPINB9, TNFSF15, STEAP3, CEACAM5, IL1A </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;"> 5 </td>
-   <td style="text-align:left;"> GPR22, RHO, RGS12, CCL2, ATRNL1 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
+   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
+   <td style="text-align:center;vertical-align:top;"> 5 </td>
+   <td style="text-align:left;vertical-align:top;"> GPR22, RHO, RGS12, CCL2, ATRNL1 </td>
   </tr>
 </tbody>
 </table>
 
 <br>
 
-Из всех up- и downregulated биологических процессов выделим те, которые связаны с иммунной системой (содержат слово "immune" в своём названии) и покажем в таблице ниже, какие их них попадают в число up- (+) и downregulated (-) в каждой точке исследования (отсортируем по убыванию среднего числа генов из числа значимых, представляющих соответствующий процесс в каждой точке и имеющих большой положительный или отрицательный средний эффект):
+Из всех биологических процессов для up- и downregulated генов выделим те, которые связаны с иммунной системой (содержат слово "immune" в своём названии) и покажем в таблице ниже, какие их них попадают в число up- (+) и downregulated (-) в каждой точке исследования (отсортируем по убыванию среднего числа генов из числа значимых, представляющих соответствующий процесс в каждой точке):
 
 
 ```r
@@ -2041,7 +2314,9 @@ t7 <- bind_rows(
   t68 %>% mutate(reg = "-", time = 7)
 ) %>%
   filter(grepl("immune", TERM, ignore.case = TRUE)) %>%
-  group_by(TERM) %>%
+  group_by(GOBPID, TERM, time) %>%
+  summarise(n = sum(n)) %>%
+  group_by(GOBPID, TERM) %>%
   summarise(n = ceiling(mean(n))) %>%
   mutate(d0 = case_when(TERM %in% t61$TERM & TERM %in% t65$TERM ~ 3,
                         TERM %in% t61$TERM ~ 1,
@@ -2055,13 +2330,13 @@ t7 <- bind_rows(
          d7 = case_when(TERM %in% t64$TERM & TERM %in% t68$TERM ~ 3,
                         TERM %in% t64$TERM ~ 1,
                         TERM %in% t68$TERM ~ 2)) %>%
-  mutate_at(vars(contains("d")), ~ factor(., 1:3, c("$+$", "$-$", "+/-"))) %>%
+  mutate_at(vars(matches("d\\d")), ~ factor(., 1:3, c("$+$", "$-$", "+/-"))) %>%
   arrange(-n, as.numeric(d0))
 
 t7 %>%
-  kable(align = "lccccc", col.names = c("BP (GO term)", "Mean N, sig.genes", "Baseline", paste(timepoints[-1], "d.")), 
-        caption = "<b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b>",
-        escape = FALSE) %>% 
+  kable(escape = FALSE, align = "clccccc",
+        col.names = c("GOBPID", "BP (GO term)", "Mean N, sig.genes", "Baseline", paste(timepoints[-1], "d.")), 
+        caption = "<b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b>") %>% 
   kableExtra::row_spec(0, bold = TRUE) %>%
   kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 13,
                           html_font = "\"Source Sans Pro\", helvetica, sans-serif")
@@ -2071,6 +2346,7 @@ t7 %>%
 <caption style="font-size: initial !important;"><b>Table 7. Up(+) and down(-) regulated immune related biological processes (GO), by time</b></caption>
  <thead>
   <tr>
+   <th style="text-align:center;font-weight: bold;"> GOBPID </th>
    <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
    <th style="text-align:center;font-weight: bold;"> Mean N, sig.genes </th>
    <th style="text-align:center;font-weight: bold;"> Baseline </th>
@@ -2081,86 +2357,61 @@ t7 %>%
  </thead>
 <tbody>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
    <td style="text-align:left;"> immune response </td>
-   <td style="text-align:center;"> 5 </td>
+   <td style="text-align:center;"> 10 </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
    <td style="text-align:left;"> innate immune response </td>
+   <td style="text-align:center;"> 10 </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002250" style="     ">GO:0002250</a> </td>
+   <td style="text-align:left;"> adaptive immune response </td>
+   <td style="text-align:center;"> 8 </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> +/- </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0061844" style="     ">GO:0061844</a> </td>
+   <td style="text-align:left;"> antimicrobial humoral immune response mediated by antimicrobial peptide </td>
    <td style="text-align:center;"> 5 </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> adaptive immune response </td>
-   <td style="text-align:center;"> 4 </td>
-   <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> antimicrobial humoral immune response mediated by antimicrobial peptide </td>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002227" style="     ">GO:0002227</a> </td>
+   <td style="text-align:left;"> innate immune response in mucosa </td>
    <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
+   <td style="text-align:center;"> $+$ </td>
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006959" style="     ">GO:0006959</a> </td>
    <td style="text-align:left;"> humoral immune response </td>
-   <td style="text-align:center;"> 2 </td>
+   <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> +/- </td>
    <td style="text-align:center;"> $+$ </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;"> +/- </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> innate immune response in mucosa </td>
-   <td style="text-align:center;"> 2 </td>
-   <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> +/- </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> cytokine production involved in immune response </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> immune response to tumor cell </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> immunoglobulin production involved in immunoglobulin-mediated immune response </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> macrophage activation involved in immune response </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002280" style="     ">GO:0002280</a> </td>
    <td style="text-align:left;"> monocyte activation involved in immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $+$ </td>
@@ -2169,15 +2420,8 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> negative regulation of type 2 immune response </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;"> $+$ </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> positive regulation of type 2 immune response </td>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002281" style="     ">GO:0002281</a> </td>
+   <td style="text-align:left;"> macrophage activation involved in immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $+$ </td>
    <td style="text-align:center;"> $+$ </td>
@@ -2185,14 +2429,34 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> regulation of immune response </td>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002367" style="     ">GO:0002367</a> </td>
+   <td style="text-align:left;"> cytokine production involved in immune response </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002381" style="     ">GO:0002381</a> </td>
+   <td style="text-align:left;"> immunoglobulin production involved in immunoglobulin-mediated immune response </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002418" style="     ">GO:0002418</a> </td>
+   <td style="text-align:left;"> immune response to tumor cell </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $+$ </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002682" style="     ">GO:0002682</a> </td>
    <td style="text-align:left;"> regulation of immune system process </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $+$ </td>
@@ -2201,6 +2465,25 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002829" style="     ">GO:0002829</a> </td>
+   <td style="text-align:left;"> negative regulation of type 2 immune response </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002830" style="     ">GO:0002830</a> </td>
+   <td style="text-align:left;"> positive regulation of type 2 immune response </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0042092" style="     ">GO:0042092</a> </td>
    <td style="text-align:left;"> type 2 immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $+$ </td>
@@ -2209,6 +2492,16 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0050776" style="     ">GO:0050776</a> </td>
+   <td style="text-align:left;"> regulation of immune response </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;"> $+$ </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> $+$ </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002218" style="     ">GO:0002218</a> </td>
    <td style="text-align:left;"> activation of innate immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $-$ </td>
@@ -2217,6 +2510,7 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002366" style="     ">GO:0002366</a> </td>
    <td style="text-align:left;"> leukocyte activation involved in immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $-$ </td>
@@ -2225,6 +2519,7 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045089" style="     ">GO:0045089</a> </td>
    <td style="text-align:left;"> positive regulation of innate immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> $-$ </td>
@@ -2233,22 +2528,7 @@ t7 %>%
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> immune response-regulating cell surface receptor signaling pathway </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> $+$ </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> immune system process </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> $-$ </td>
-  </tr>
-  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002283" style="     ">GO:0002283</a> </td>
    <td style="text-align:left;"> neutrophil activation involved in immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
@@ -2257,6 +2537,25 @@ t7 %>%
    <td style="text-align:center;"> $-$ </td>
   </tr>
   <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002376" style="     ">GO:0002376</a> </td>
+   <td style="text-align:left;"> immune system process </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> $-$ </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0002768" style="     ">GO:0002768</a> </td>
+   <td style="text-align:left;"> immune response-regulating cell surface receptor signaling pathway </td>
+   <td style="text-align:center;"> 1 </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> $+$ </td>
+  </tr>
+  <tr>
+   <td style="text-align:center;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0032826" style="     ">GO:0032826</a> </td>
    <td style="text-align:left;"> regulation of natural killer cell differentiation involved in immune response </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
@@ -2273,14 +2572,12 @@ t7 %>%
 
 <br>
 
-Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты найденных нами генов. Выше мы уже использовали GO для определения аннотаций для этих процессов по некоторым наборам генов.
-
-Поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, гены для каких именно биологических процессов "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа. 
+Выше мы уже использовали базу Gene Ontology (GO) для определения аннотаций биологических процессов, в которых участвуют белковые продукты генов, дифференциально экспрессированных у испытуемых с разным уровнем ответа на вакцинацию. Однако поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, какие именно биологические процессы "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа (в нашем случае 5 тыс.). 
 
 В своём исследовании мы будем выявлять такие процессы, основываясь на оценке p-values гипергеометрического распределения, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
 где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
 
-В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости - мы в качестве порога будем использовать 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
 
 SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей.
 
@@ -2574,9 +2871,9 @@ imap_dfr(
 
 <br>
 
-Видим, что в моделях с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленным в каком-либо из наборов генов со значимыми различиями в экспрессии в какой-либо точке или в её динамике в зависимости от уровня ответа на вакцинацию. В моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди "значимых" (FGFR2, MATN1, BNC2, RARA, RARB), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
+Видим, что в моделях с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленным в каком-либо из наборов генов со значимыми различиями в экспрессии в какой-либо точке или в её динамике в зависимости от уровня ответа на вакцинацию. В моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди значимых (FGFR2, MATN1, BNC2, RARA, RARB), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
 
-Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (только в модели с рангами, для ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
+Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (модель с рангами, ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
 
 <br>
 
