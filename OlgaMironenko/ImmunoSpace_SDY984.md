@@ -34,6 +34,7 @@ library(ggrepel)
 library(lemon)
 library(ComplexUpset)
 library(colorspace)
+library(ggpubr)
 library(lme4)
 library(lmerTest)
 library(marginaleffects)
@@ -51,7 +52,7 @@ list("style_number-arg:big.mark" = "") %>% set_gtsummary_theme()
 
 # Function for upset plots
 
-upset_plot <- function(data, sets_names, rowcolors, title, subtitle, showh = TRUE, ab_hjust = -0.95) {
+upset_plot <- function(data, sets_names, rowcolors, title, subtitle, showh = TRUE, ab_hjust = -0.95, nletters = 1) {
   
   p1 <- upset(
     data, sets_names, name = "gene", sort_sets = FALSE,
@@ -65,8 +66,8 @@ upset_plot <- function(data, sets_names, rowcolors, title, subtitle, showh = TRU
                            colour = "on_background"),
         text = list(size = 3.5)
       ) +
-        scale_y_continuous(expand = c(0.07,0)) +
-        labs(title = "A. Inclusive intersection size") +
+        scale_y_continuous(expand = c(0.1,0)) +
+        labs(title = sprintf("%s. Incl. intersection size", LETTERS[nletters*2 - 1])) +
         theme(legend.position = "none",
               panel.grid.major.x = element_blank(),
               panel.grid.minor.x = element_blank(),
@@ -98,8 +99,8 @@ upset_plot <- function(data, sets_names, rowcolors, title, subtitle, showh = TRU
         annotate(geom = "text", x = Inf, y = Inf,
                  label = sprintf("%d\nunique genes", nrow(data)),
                  vjust = 1, hjust = 1) +
-        scale_y_continuous(expand = c(0.07,0)) +
-        labs(title = "B. Exclusive intersection size") +
+        scale_y_continuous(expand = c(0.1,0)) +
+        labs(title = sprintf("%s. Excl. intersection size", LETTERS[nletters*2])) +
         theme(panel.grid.major.x = element_blank(),
               panel.grid.minor.x = element_blank(),
               axis.ticks.y = element_line(color = "grey50", linewidth = 0.2),
@@ -2804,6 +2805,115 @@ upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
 
 ![](ImmunoSpace_SDY984_files/figure-html/fig8_upset_logreg-2.png)<!-- -->
 
+Также может быть интересно сопоставить для каждой точки исследования набор генов со значимым средним эффектом ответа на экспрессию с набором генов со значимым отношением шансов ответа при увеличении экспрессии гена на 1 - результаты на графиках ниже:
+
+
+```r
+upset_plt_df_1 <- genes_maxvar %>%
+  select(init_int_ame0, log_init_0) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p1 <- upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+                 rep("#F1CE63", 2),
+                 element_blank(), "Expression as is", TRUE, 0.4)
+
+upset_plt_df_2 <- genes_maxvar %>%
+  select(rank_int_ame0, log_rank_0) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+                 rep("#A0CBE8", 2),
+                 element_blank(), "Ranks by expression", TRUE, 0.4, 2)
+
+p12 <- ggarrange(p1, p2, nrow = 2)
+annotate_figure(p12, top = text_grob("Figure 9(1). Intersection of gene sets with significant ATEs and ORs, Baseline",
+                                     face = "bold", size = 12, hjust = 0.5))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig9_compmodels-1.png)<!-- -->
+
+```r
+upset_plt_df_1 <- genes_maxvar %>%
+  select(init_int_ame1, log_init_1) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p1 <- upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+                 rep("#F1CE63", 2),
+                 element_blank(), "Expression as is", TRUE, 0.2)
+
+upset_plt_df_2 <- genes_maxvar %>%
+  select(rank_int_ame1, log_rank_1) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+                 rep("#A0CBE8", 2),
+                 element_blank(), "Ranks by expression", TRUE, 0.2, 2)
+
+p12 <- ggarrange(p1, p2, nrow = 2)
+annotate_figure(p12, top = text_grob("Figure 9(2). Intersection of gene sets with significant ATEs and ORs, 1 day",
+                                     face = "bold", size = 12, hjust = 0.5))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig9_compmodels-2.png)<!-- -->
+
+```r
+upset_plt_df_1 <- genes_maxvar %>%
+  select(init_int_ame3, log_init_3) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p1 <- upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+                 rep("#F1CE63", 2),
+                 element_blank(), "Expression as is", TRUE, 0.2)
+
+upset_plt_df_2 <- genes_maxvar %>%
+  select(rank_int_ame3, log_rank_3) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+                 rep("#A0CBE8", 2),
+                 element_blank(), "Ranks by expression", TRUE, 0.2, 2)
+
+p12 <- ggarrange(p1, p2, nrow = 2)
+annotate_figure(p12, top = text_grob("Figure 9(3). Intersection of gene sets with significant ATEs and ORs, 3 days",
+                                     face = "bold", size = 12, hjust = 0.5))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig9_compmodels-3.png)<!-- -->
+
+```r
+upset_plt_df_1 <- genes_maxvar %>%
+  select(init_int_ame7, log_init_7) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p1 <- upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+                 rep("#F1CE63", 2),
+                 element_blank(), "Expression as is", TRUE, 0.2)
+
+upset_plt_df_2 <- genes_maxvar %>%
+  select(rank_int_ame7, log_rank_7) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(c(genes_sig_lbls, genes_sig_logreg_lbls)[names(.)])
+
+p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+                 rep("#A0CBE8", 2),
+                 element_blank(), "Ranks by expression", TRUE, 0.2, 2)
+
+p12 <- ggarrange(p1, p2, nrow = 2)
+annotate_figure(p12, top = text_grob("Figure 9(4). Intersection of gene sets with significant ATEs and ORs, 7 days",
+                                     face = "bold", size = 12, hjust = 0.5))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig9_compmodels-4.png)<!-- -->
+
+Видим, что наборы, найденные с помощью двух разных подходов, относительно слабо пересекаются друг с другом до вакцинации и в 1-3 дня после неё - и только в 7 дней пересечение становится заметным.
+
 <br>
 
 #### **Статистическая значимость vs. размер эффекта**
@@ -2839,7 +2949,7 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = bquote(log[10](OR)), y = bquote(-log[10](p[OR])), 
-       title = "Figure 9. P-value vs. size of gene expression's effect on response",
+       title = "Figure 10. P-value vs. size of gene expression's effect on response",
        subtitle = bquote(log[10]~"odds ratios after logistic regressions for the (strong) response"),
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -2854,7 +2964,7 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig9_volcano_or-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig10_volcano_or-1.png)<!-- -->
 
 <br>
 
