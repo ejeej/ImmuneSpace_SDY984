@@ -2,7 +2,7 @@
 title: '**ImmuneSpace: study SDY984**'
 subtitle: '**Genes expression under varicella zoster vaccine**'
 author: "Мироненко Ольга"
-date: "2023-01-06"
+date: "2023-01-14"
 output:
   html_document:
     code_folding: hide
@@ -4142,7 +4142,11 @@ t9 %>%
 В своём исследовании мы будем выявлять такие процессы, основываясь на оценке p-values гипергеометрического распределения, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
 где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
 
-В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). 
+
+После оценки гипергеометрического теста исключим выявленные в нём биологические процессы, в которых вошло менее 5 генов из числа значимых - далее будем работать с p-values по оставшимся процессам.
+
+Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
 
 SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей и логистических регрессий.
 
@@ -4208,6 +4212,7 @@ hg_res_pq <- imap(
   ~ cbind(pvalue = Category::pvalues(.x),
           Count = Category::geneCounts(.x))%>%
     as_tibble(rownames = "GOID") %>%
+    filter(Count > 4) %>%
     # adjusting p-values and calculate qvalues
     mutate(GeneRatio = Count/length(Category::geneIds(.x)),
            p.adjust = p.adjust(pvalue, method = "BH"),
@@ -4277,12 +4282,12 @@ imap_dfr(
 <tbody>
   <tr>
    <td style="text-align:left;"> Expr., sig. b2 (Baseline) </td>
+   <td style="text-align:center;"> 8 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 20 </td>
+   <td style="text-align:center;"> 12 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
@@ -4299,23 +4304,23 @@ imap_dfr(
   </tr>
   <tr>
    <td style="text-align:left;"> Expr., sig. b2 (Overall) </td>
+   <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
    <td style="text-align:left;"> Expr., sig. ATE (Baseline) </td>
+   <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 10 </td>
+   <td style="text-align:center;"> 4 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
@@ -4325,7 +4330,7 @@ imap_dfr(
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -4354,13 +4359,13 @@ imap_dfr(
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. b2 (Baseline) </td>
+   <td style="text-align:center;"> 6 </td>
    <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 55 </td>
+   <td style="text-align:center;"> 7 </td>
    <td style="text-align:center;"> 2 </td>
-   <td style="text-align:center;"> 2 </td>
-   <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
@@ -4387,24 +4392,24 @@ imap_dfr(
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. ATE (Baseline) </td>
+   <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 39 </td>
+   <td style="text-align:center;"> 8 </td>
    <td style="text-align:center;"> 2 </td>
-   <td style="text-align:center;"> 2 </td>
-   <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. ATE (1 d.) </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 10 </td>
    <td style="text-align:center;"> 8 </td>
-   <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
+   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 38 </td>
+   <td style="text-align:center;"> 10 </td>
+   <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
@@ -4435,7 +4440,7 @@ imap_dfr(
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 18 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -4446,8 +4451,8 @@ imap_dfr(
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 136 </td>
+   <td style="text-align:center;"> 21 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
   </tr>
@@ -4464,11 +4469,11 @@ imap_dfr(
   </tr>
   <tr>
    <td style="text-align:left;"> Expr., sig.OR (7 d.) </td>
+   <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
+   <td style="text-align:center;"> 2 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -4520,10 +4525,324 @@ imap_dfr(
 </tbody>
 </table>
 
+Видим, что, в основном, перепредставленные процессы обнаруживаются до вакцинации или в 1 день после неё.
 
+В таблице ниже перечислим все процессы с q-value < 0.05, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели.
+
+
+```r
+imap_dfr(
+  hg_res_pq,
+  ~ .x %>% filter(qvalue < 0.05) %>% 
+    transmute(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]], 
+              GOID, TERM, DEFINITION, Count, up, down, genes)) %>%
+  mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]")) %>%
+  transmute(time, GOID, TERM, DEFINITION) %>%
+  unique() %>%
+  arrange(time, GOID) %>%
+  kable(align = "lcll",
+        col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
+        caption = "<b>Table 11. Overrepresented BPs, by time</b>") %>%
+  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::column_spec(1:4, extra_css = "vertical-align:top;") %>%
+  kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
+                            html_font = "\"Source Sans Pro\", helvetica, sans-serif")
+```
+
+<table class=" lightable-classic" style='font-size: 14px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
+<caption style="font-size: initial !important;"><b>Table 11. Overrepresented BPs, by time</b></caption>
+ <thead>
+  <tr>
+   <th style="text-align:left;font-weight: bold;"> Time </th>
+   <th style="text-align:center;font-weight: bold;"> GOBPID </th>
+   <th style="text-align:left;font-weight: bold;"> BP (GO term) </th>
+   <th style="text-align:left;font-weight: bold;"> Definition (GO) </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0003416 </td>
+   <td style="text-align:left;vertical-align:top;"> endochondral bone growth </td>
+   <td style="text-align:left;vertical-align:top;"> The increase in size or mass of an endochondral bone that contributes to the shaping of the bone. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0006636 </td>
+   <td style="text-align:left;vertical-align:top;"> unsaturated fatty acid biosynthetic process </td>
+   <td style="text-align:left;vertical-align:top;"> The chemical reactions and pathways resulting in the formation of an unsaturated fatty acid, any fatty acid containing one or more double bonds between carbon atoms. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0007166 </td>
+   <td style="text-align:left;vertical-align:top;"> cell surface receptor signaling pathway </td>
+   <td style="text-align:left;vertical-align:top;"> A series of molecular signals initiated by activation of a receptor on the surface of a cell. The pathway begins with binding of an extracellular ligand to a cell surface receptor, or for receptors that signal in the absence of a ligand, by ligand-withdrawal or the activity of a constitutively active receptor. The pathway ends with regulation of a downstream cellular process, e.g. transcription. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0007569 </td>
+   <td style="text-align:left;vertical-align:top;"> cell aging </td>
+   <td style="text-align:left;vertical-align:top;"> An aging process that has as participant a cell after a cell has stopped dividing. Cell aging may occur when a cell has temporarily stopped dividing through cell cycle arrest (GO:0007050) or when a cell has permanently stopped dividing, in which case it is undergoing cellular senescence (GO:0090398). May precede cell death (GO:0008219) and succeed cell maturation (GO:0048469). </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0009893 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of metabolic process </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the chemical reactions and pathways within a cell or an organism. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0009967 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of signal transduction </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of signal transduction. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0010171 </td>
+   <td style="text-align:left;vertical-align:top;"> body morphogenesis </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which the anatomical structures of the soma are generated and organized. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0010959 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of metal ion transport </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate, or extent of metal ion transport. Metal ion transport is the directed movement of metal ions, any metal ion with an electric charge, into, out of or within a cell, or between cells, by means of some agent such as a transporter or pore. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0019369 </td>
+   <td style="text-align:left;vertical-align:top;"> arachidonic acid metabolic process </td>
+   <td style="text-align:left;vertical-align:top;"> The chemical reactions and pathways involving arachidonic acid, a straight chain fatty acid with 20 carbon atoms and four double bonds per molecule. Arachidonic acid is the all-Z-(5,8,11,14)-isomer. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0030003 </td>
+   <td style="text-align:left;vertical-align:top;"> cellular cation homeostasis </td>
+   <td style="text-align:left;vertical-align:top;"> Any process involved in the maintenance of an internal steady state of cations at the level of a cell. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0030198 </td>
+   <td style="text-align:left;vertical-align:top;"> extracellular matrix organization </td>
+   <td style="text-align:left;vertical-align:top;"> A process that is carried out at the cellular level which results in the assembly, arrangement of constituent parts, or disassembly of an extracellular matrix. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0030336 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of cell migration </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cell migration. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0040013 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of locomotion </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of locomotion of a cell or organism. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0042325 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of phosphorylation </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of addition of phosphate groups into a molecule. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0045937 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of phosphate metabolic process </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the chemical reactions and pathways involving phosphates. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0046456 </td>
+   <td style="text-align:left;vertical-align:top;"> icosanoid biosynthetic process </td>
+   <td style="text-align:left;vertical-align:top;"> The chemical reactions and pathways resulting in the formation of icosanoids, any of a group of C20 polyunsaturated fatty acids. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0048518 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of biological process </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of a biological process. Biological processes are regulated by many means; examples include the control of gene expression, protein modification or interaction with a protein or substrate molecule. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0048522 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of cellular process </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of a cellular process, any of those that are carried out at the cellular level, but are not necessarily restricted to a single cell. For example, cell communication occurs among more than one cell, but occurs at the cellular level. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0048844 </td>
+   <td style="text-align:left;vertical-align:top;"> artery morphogenesis </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which the anatomical structures of arterial blood vessels are generated and organized. Arteries are blood vessels that transport blood from the heart to the body and its organs. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0050801 </td>
+   <td style="text-align:left;vertical-align:top;"> ion homeostasis </td>
+   <td style="text-align:left;vertical-align:top;"> Any process involved in the maintenance of an internal steady state of ions within an organism or cell. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051174 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of phosphorus metabolic process </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of the chemical reactions and pathways involving phosphorus or compounds containing phosphorus. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051271 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of cellular component movement </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of the movement of a cellular component. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051480 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of cytosolic calcium ion concentration </td>
+   <td style="text-align:left;vertical-align:top;"> Any process involved in the maintenance of an internal steady state of calcium ions within the cytosol of a cell or between the cytosol and its surroundings. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051928 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of calcium ion transport </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the directed movement of calcium ions into, out of or within a cell, or between cells, by means of some agent such as a transporter or pore. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0055010 </td>
+   <td style="text-align:left;vertical-align:top;"> ventricular cardiac muscle tissue morphogenesis </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which the anatomical structures of cardiac ventricle muscle is generated and organized. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0055065 </td>
+   <td style="text-align:left;vertical-align:top;"> metal ion homeostasis </td>
+   <td style="text-align:left;vertical-align:top;"> Any process involved in the maintenance of an internal steady state of metal ions within an organism or cell. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0060415 </td>
+   <td style="text-align:left;vertical-align:top;"> muscle tissue morphogenesis </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which the anatomical structures of muscle tissue are generated and organized. Muscle tissue consists of a set of cells that are part of an organ and carry out a contractive function. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0072507 </td>
+   <td style="text-align:left;vertical-align:top;"> divalent inorganic cation homeostasis </td>
+   <td style="text-align:left;vertical-align:top;"> Any process involved in the maintenance of an internal steady state of divalent cations within an organism or cell. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0098868 </td>
+   <td style="text-align:left;vertical-align:top;"> bone growth </td>
+   <td style="text-align:left;vertical-align:top;"> The increase in size or mass of a bone that contributes to the shaping of that bone. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:1902531 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of intracellular signal transduction </td>
+   <td style="text-align:left;vertical-align:top;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;vertical-align:top;"> GO:2000772 </td>
+   <td style="text-align:left;vertical-align:top;"> regulation of cellular senescence </td>
+   <td style="text-align:left;vertical-align:top;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0002067 </td>
+   <td style="text-align:left;vertical-align:top;"> glandular epithelial cell differentiation </td>
+   <td style="text-align:left;vertical-align:top;"> The process in which a relatively unspecialized cell acquires specialized features of a glandular epithelial cell. A glandular epithelial cell is a columnar/cuboidal epithelial cell found in a two dimensional sheet with a free surface exposed to the lumen of a gland. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0003416 </td>
+   <td style="text-align:left;vertical-align:top;"> endochondral bone growth </td>
+   <td style="text-align:left;vertical-align:top;"> The increase in size or mass of an endochondral bone that contributes to the shaping of the bone. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0007187 </td>
+   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway, coupled to cyclic nucleotide second messenger </td>
+   <td style="text-align:left;vertical-align:top;"> The series of molecular signals generated as a consequence of a G protein-coupled receptor binding to its physiological ligand, where the pathway proceeds with activation or inhibition of a nucleotide cyclase activity and a subsequent change in the concentration of a cyclic nucleotide. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0007569 </td>
+   <td style="text-align:left;vertical-align:top;"> cell aging </td>
+   <td style="text-align:left;vertical-align:top;"> An aging process that has as participant a cell after a cell has stopped dividing. Cell aging may occur when a cell has temporarily stopped dividing through cell cycle arrest (GO:0007050) or when a cell has permanently stopped dividing, in which case it is undergoing cellular senescence (GO:0090398). May precede cell death (GO:0008219) and succeed cell maturation (GO:0048469). </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0007605 </td>
+   <td style="text-align:left;vertical-align:top;"> sensory perception of sound </td>
+   <td style="text-align:left;vertical-align:top;"> The series of events required for an organism to receive an auditory stimulus, convert it to a molecular signal, and recognize and characterize the signal. Sonic stimuli are detected in the form of vibrations and are processed to form a sound. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0015872 </td>
+   <td style="text-align:left;vertical-align:top;"> dopamine transport </td>
+   <td style="text-align:left;vertical-align:top;"> The directed movement of dopamine into, out of or within a cell, or between cells, by means of some agent such as a transporter or pore. Dopamine is a catecholamine neurotransmitter and a metabolic precursor of noradrenaline and adrenaline. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0044262 </td>
+   <td style="text-align:left;vertical-align:top;"> cellular carbohydrate metabolic process </td>
+   <td style="text-align:left;vertical-align:top;"> The chemical reactions and pathways involving carbohydrates, any of a group of organic compounds based of the general formula Cx(H2O)y, as carried out by individual cells. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0046661 </td>
+   <td style="text-align:left;vertical-align:top;"> male sex differentiation </td>
+   <td style="text-align:left;vertical-align:top;"> The establishment of the sex of a male organism by physical differentiation. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0048568 </td>
+   <td style="text-align:left;vertical-align:top;"> embryonic organ development </td>
+   <td style="text-align:left;vertical-align:top;"> Development, taking place during the embryonic phase, of a tissue or tissues that work together to perform a specific function or functions. Development pertains to the process whose specific outcome is the progression of a structure over time, from its formation to the mature structure. Organs are commonly observed as visibly distinct structures, but may also exist as loosely associated clusters of cells that work together to perform a specific function or functions. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051057 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of small GTPase mediated signal transduction </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of small GTPase mediated signal transduction. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051148 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of muscle cell differentiation </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of muscle cell differentiation. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051154 </td>
+   <td style="text-align:left;vertical-align:top;"> negative regulation of striated muscle cell differentiation </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of striated muscle cell differentiation. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051482 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of cytosolic calcium ion concentration involved in phospholipase C-activating G protein-coupled signaling pathway </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that increases the concentration of calcium ions in the cytosol that occurs as part of a PLC-activating G protein-coupled receptor signaling pathway. G-protein-activated PLC hydrolyses phosphatidylinositol-bisphosphate (PIP2) to release diacylglycerol (DAG) and inositol trisphosphate (IP3). IP3 then binds to calcium release channels in the endoplasmic reticulum (ER) to trigger calcium ion release into the cytosol. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0051928 </td>
+   <td style="text-align:left;vertical-align:top;"> positive regulation of calcium ion transport </td>
+   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the directed movement of calcium ions into, out of or within a cell, or between cells, by means of some agent such as a transporter or pore. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0060348 </td>
+   <td style="text-align:left;vertical-align:top;"> bone development </td>
+   <td style="text-align:left;vertical-align:top;"> The process whose specific outcome is the progression of bone over time, from its formation to the mature structure. Bone is the hard skeletal connective tissue consisting of both mineral and cellular components. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;vertical-align:top;"> Baseline </td>
+   <td style="text-align:center;vertical-align:top;"> GO:0098868 </td>
+   <td style="text-align:left;vertical-align:top;"> bone growth </td>
+   <td style="text-align:left;vertical-align:top;"> The increase in size or mass of a bone that contributes to the shaping of that bone. </td>
+  </tr>
+</tbody>
+</table>
 
 <br>
-
-Видим, что по результатам оценки логистических регрессий и смешанных моделей с исходными данными по экспрессии не удалось выявить ни одного биологического процесса, который можно было бы считать перепредставленными. В смешанных моделях с индивидуальными рангами генов по экспрессии такие процессы обнаруживаются, но их довольно мало: на 5%-ном уровне значимости можно считать перепредставленными 1-2 процесса до вакцинации и максимум 1 в точке 1 день после вакцинации. В каждом случае речь о процессах endochondral bone growth и bone growth - оба они представлены одними и теми же генами среди значимых (FGFR2, MATN1, BNC2, RARA, RARB), при этом для трёх из них соответствующий эффект имеет положительный знак (ранг по экспрессии, в среднем, больше у сильно ответивших по сравнению со слабо ответившими), а для двух - отрицательный (ранг по экспрессии, в среднем, меньше у сильно ответивших по сравнению со слабо ответившими).
-
-Замечу, что я также пробовала оценивать перепредставленность процессов с помощью точного теста Фишера (функция `enrichGO` из пакета `clusterProfiler`) - с его помощью удалось также выявить только 2 процесса со скорректированным p-value < 0.05 и с q-value < 0.05 (смешанная модель с рангами, ATE в 1 день после вакцинации): cellular calcium ion homeostasis и calcium ion homeostasis, оба из них были представлены 27-ю генами (CCR3, PTGDR, SLC24A3, GRIN2C, RIC3, SV2A, CCL5, MCOLN3, F2R, EDN1, CHRNA10, GTF2I, LPAR4, P2RX2, ATP2C2, GPR174, TRPV3, DRD1, CXCL9, CCR8, RGN, TRPC6, TSPOAP1, ATP2B4, CDH23, LPAR3, HRH4).
