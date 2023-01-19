@@ -2,7 +2,7 @@
 title: '**ImmuneSpace: study SDY984**'
 subtitle: '**Genes expression under varicella zoster vaccine**'
 author: "Мироненко Ольга"
-date: "2023-01-15"
+date: "2023-01-19"
 output:
   html_document:
     code_folding: hide
@@ -217,6 +217,12 @@ df_expr <- df_expr %>%
 # Длинный датафрейм
 df_expr_long <- df_expr %>%
   pivot_longer(A1BG:last_col(), names_to = "gene", values_to = "expr")
+
+# All offsprings for GO BP = immune system process | defense response
+gobp_immresp <- tibble(
+  GOBPID = c("GO:0002376", GO.db::GOBPOFFSPRING[["GO:0002376"]], "GO:0006952", GO.db::GOBPOFFSPRING[["GO:0006952"]]),
+  TERM = AnnotationDbi::Term(GOBPID)) %>%
+  unique()
 ```
 
 ## **Общая информация**
@@ -869,7 +875,7 @@ df_expr_long_fin <- df_expr_long_fin %>%
 
 <br>
 
-Для каждого гена из ранее отобранных 5 тыс. оценим линейные смешанные модели (linear mixed effects model) вида:
+Для каждого гена из ранее отобранных 5 тыс. оценим **линейные смешанные модели (linear mixed effects model) вида**:
 
 1. $expr_{it} = \beta_0 + \beta_{0i} + \beta_1*time_{j} + \beta_2*response_{i} + \epsilon_{ij}$, где:
 
@@ -1054,6 +1060,11 @@ genes_sig$rank_int_b2b3 <- lmer_sig_int %>% filter(sig_b2 & sig_b3 & expr != "Ex
 
 genes_sig_lbls$init_int_b2b3 <- "Expr., sig. b2 and b3"
 genes_sig_lbls$rank_int_b2b3 <- "Ranks, sig. b2 and b3"
+
+# Whether each gene was significant in any model
+genes_maxvar <- cbind(
+  genes_maxvar,
+  map_dfc(genes_sig, ~ genes_maxvar$gene %in% .x))
 ```
 
 <br>
@@ -1066,358 +1077,11 @@ genes_sig_lbls$rank_int_b2b3 <- "Ranks, sig. b2 and b3"
 
 <br>
 
-Всего получилось 414 генов в модели с исходными значениями для экспрессии и 386 генов в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе в регрессиях без эффекта пересечения - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
+Всего получилось 414 генов в модели с исходными значениями для экспрессии и 386 генов в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим коэффициент при ответе **в регрессиях без эффекта пересечения** - иными словами, значимо различается среднее значение экспрессии между испытуемыми с разным уровнем ответа по всем точкам исследования. 
 
-В регрессиях с эффектами пересечения обнаружилось 49 генов в модели с исходными значениями для экспрессии и 42 гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для 277 (260) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для 318 (337) генов был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
+**В регрессиях с эффектами пересечения** обнаружилось 49 генов в модели с исходными значениями для экспрессии и 42 гена в модели с рангами для экспрессии, для которых на 5%-ном уровне значимости статистически значим и основной эффект для ответа, и эффект пересечения ответа со временем, т.е. испытуемые с разным уровнем ответа значимо отличались не только по среднему значению экспрессии данных генов до вакцинации, но и по его динамике. Ещё для 277 (260) генов в соответствующих моделях был значим только основной эффект, т.е. испытуемые с разным ответом на вакцинацию изначально различались по экспрессии этих генов, но её динамика была схожей в этих группах. Ещё для 318 (337) генов был значим только эффект пересечения, т.е. испытуемые с разным ответом на вакцинацию изначально не различались по экспрессии этих генов, но её динамика была в этих группах разной.
 
-Ниже на графике покажем, насколько пересекаются наборы генов-находок, выявленных по статистической значимости коэффициентов в моделях с и без эффектов пересечения.
-
-
-```r
-upset_plt_df <- cbind(
-  gene = genes_maxvar$gene,
-  map_dfc(genes_sig[grepl("_b\\d$", names(genes_sig))], ~ genes_maxvar$gene %in% .x)) %>%
-  filter(if_any(-gene, ~.)) %>%
-  setNames(c("gene", genes_sig_lbls[names(.)[-1]]))
-
-upset_plot(upset_plt_df, rev(colnames(upset_plt_df)[-1]), 
-           c(darken("#A0CBE8"), rep("#A0CBE8", 2), darken("#F1CE63"), rep("#F1CE63", 2)),
-           "Figure 3. Intersection of gene sets with significant coefficients",
-           "Linear mixed models with and without the interaction term", FALSE, -0.3) +
-  labs(caption = "Models with the interaction term:\n sig. b2 (Baseline) = p < 0.05 for the coeff-t near the main effect of the response,\n sig. b3 (Change) = p < 0.05 for the coeff-t near the response * time interaction.\nModels without the interaction term:\n sig. b2 (Overall) = p < 0.05 coeff-t for the response.") +
-  theme(plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
-```
-
-![](ImmunoSpace_SDY984_files/figure-html/fig3_upset_int_noint-1.png)<!-- -->
-
-Из всех уникальных генов, для которых был статистически значимым хотя бы один коэффициент в линейных смешанных моделей, больше всего генов имели значимый коэффициент при эффекте пересечения ответа со временем в моделях и с исходными данными по экспрессии, и с рангами генов по экспрессии. 
-
-<br>
-
-Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value < 0.05 для соответствующего ATE).
-
-
-```r
-# Whether each gene was significant in any model
-genes_maxvar <- cbind(
-  genes_maxvar,
-  map_dfc(genes_sig[!grepl("b2b3", names(genes_sig))], ~ genes_maxvar$gene %in% .x))
-
-upset_plt_df_1 <- genes_maxvar %>%
-  select(contains("init_int_ame")) %>%
-  filter(if_any(everything(), ~.)) %>%
-  setNames(genes_sig_lbls[names(.)])
-
-upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
-           rep("#F1CE63", 4),
-           "Figure 4(1). Intersection of gene sets with significant ATEs,\nExpression as is",
-           "Linear mixed models with the interaction term", TRUE, -0.8)
-```
-
-![](ImmunoSpace_SDY984_files/figure-html/fig4_upset_ame-1.png)<!-- -->
-
-```r
-upset_plt_df_2 <- genes_maxvar %>%
-  select(contains("rank_int_ame")) %>%
-  filter(if_any(everything(), ~.)) %>%
-  setNames(genes_sig_lbls[names(.)])
-
-upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
-           rep("#A0CBE8", 4),
-           "Figure 4(2). Intersection of gene sets with significant ATEs,\nRanks by expression",
-           "Linear mixed models with the interaction term", TRUE, -0.8)
-```
-
-![](ImmunoSpace_SDY984_files/figure-html/fig4_upset_ame-2.png)<!-- -->
-
-```r
-genes_sig_ame7 <- genes_maxvar %>% 
-  filter((init_int_ame7 | rank_int_ame7) & 
-           !init_int_ame0 & !init_int_ame1 & !init_int_ame3 &
-           !rank_int_ame0 & !rank_int_ame1 & !rank_int_ame3)
-```
-
-Для относительно небольшого числа генов средний эффект воздействия ответа в отношении экспрессии является статистически значимым на всём протяжении исследования (от 0 до 7 дней). Также относительно невелико число генов, для которых ATE был статистически незначим до вакцинации, но был значимым с 1 по 7 дни, как и генов, для которых, наоборот значимость ATE до вакцинации сменилась на статистическую незначимость с 1 по 7 дней после неё. Но самое примечательное - мода: для наибольшего числа генов ATE стал значимым только к 7 дням после вакцинации.
-
-Всего для 310 ATE в 7 дней был значим в модели с исходными данными по экспрессии или с рангами по экспрессии, но не значим ни в одной из них в 0-3 дня. Ниже представлены биологические процессы, в которых участвуют продукты этих генов (с количеством генов из указанного числа, 5 и более).
-
-
-```r
-t4 <- bp_genesF(genes_sig_ame7)
-t4$GOBPID <- kableExtra::cell_spec(t4$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", t4$GOBPID))
-
-t4 %>%
-  select(-genes) %>%
-  filter(n > 4) %>%
-  kable(escape = FALSE, align = "lclcl", col.names = c("BP (GO term)", "GOBPID", "Definition (GO)", "N, sig.genes"), 
-        caption = "<b>Table 4. Biological processes (GO) for genes with significant ATE at 7 d. and insignificant ATE at 0-3 d.</b>") %>% 
-  kableExtra::row_spec(0, bold = TRUE, align = "c") %>%
-  kableExtra::column_spec(1:4, extra_css = "vertical-align:top;") %>%
-  kableExtra::kable_paper(full_width = FALSE, position = "left", font_size = 12,
-                          html_font = "\"Source Sans Pro\", helvetica, sans-serif")
-```
-
-<table class=" lightable-paper" style='font-size: 12px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 4. Biological processes (GO) for genes with significant ATE at 7 d. and insignificant ATE at 0-3 d.</b></caption>
- <thead>
-  <tr>
-   <th style="text-align:left;font-weight: bold;text-align: center;"> BP (GO term) </th>
-   <th style="text-align:center;font-weight: bold;text-align: center;"> GOBPID </th>
-   <th style="text-align:left;font-weight: bold;text-align: center;"> Definition (GO) </th>
-   <th style="text-align:center;font-weight: bold;text-align: center;"> N, sig.genes </th>
-  </tr>
- </thead>
-<tbody>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006357" style="     ">GO:0006357</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
-   <td style="text-align:center;vertical-align:top;"> 33 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> signal transduction </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007165" style="     ">GO:0007165</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The cellular process in which a signal is conveyed to trigger a change in the activity or state of a cell. Signal transduction begins with reception of a signal (e.g. a ligand binding to a receptor or receptor activation by a stimulus such as light), or for signal transduction in the absence of ligand, signal-withdrawal or the activity of a constitutively active receptor. Signal transduction ends with regulation of a downstream cellular process, e.g. regulation of transcription or regulation of a metabolic process. Signal transduction covers signaling from receptors located on the surface of the cell and signaling via molecules located within the cell. For signaling between cells, signal transduction is restricted to events at and within the receiving cell. </td>
-   <td style="text-align:center;vertical-align:top;"> 20 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045944" style="     ">GO:0045944</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of transcription from an RNA polymerase II promoter. </td>
-   <td style="text-align:center;vertical-align:top;"> 18 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription by RNA polymerase II </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000122" style="     ">GO:0000122</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of transcription mediated by RNA polymerase II. </td>
-   <td style="text-align:center;vertical-align:top;"> 15 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> regulation of transcription, DNA-templated </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006355" style="     ">GO:0006355</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of cellular DNA-templated transcription. </td>
-   <td style="text-align:center;vertical-align:top;"> 13 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> negative regulation of transcription, DNA-templated </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045892" style="     ">GO:0045892</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cellular DNA-templated transcription. </td>
-   <td style="text-align:center;vertical-align:top;"> 11 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> cell adhesion </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007155" style="     ">GO:0007155</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The attachment of a cell, either to another cell or to an underlying substrate such as the extracellular matrix, via cell adhesion molecules. </td>
-   <td style="text-align:center;vertical-align:top;"> 9 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> G protein-coupled receptor signaling pathway </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007186" style="     ">GO:0007186</a> </td>
-   <td style="text-align:left;vertical-align:top;"> A series of molecular signals that proceeds with an activated receptor promoting the exchange of GDP for GTP on the alpha-subunit of an associated heterotrimeric G-protein complex. The GTP-bound activated alpha-G-protein then dissociates from the beta- and gamma-subunits to further transmit the signal within the cell. The pathway begins with receptor-ligand interaction, or for basal GPCR signaling the pathway begins with the receptor activating its G protein in the absence of an agonist, and ends with regulation of a downstream cellular process, e.g. transcription.  The pathway can start from the plasma membrane, Golgi or nuclear membrane. </td>
-   <td style="text-align:center;vertical-align:top;"> 9 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> multicellular organism development </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007275" style="     ">GO:0007275</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The biological process whose specific outcome is the progression of a multicellular organism over time from an initial condition (e.g. a zygote or a young adult) to a later condition (e.g. a multicellular animal or an aged adult). </td>
-   <td style="text-align:center;vertical-align:top;"> 9 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> negative regulation of apoptotic process </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0043066" style="     ">GO:0043066</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cell death by apoptotic process. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> negative regulation of cell population proliferation </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0008285" style="     ">GO:0008285</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents or reduces the rate or extent of cell proliferation. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> positive regulation of gene expression </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010628" style="     ">GO:0010628</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that increases the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> positive regulation of transcription, DNA-templated </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045893" style="     ">GO:0045893</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of cellular DNA-templated transcription. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> response to hypoxia </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0001666" style="     ">GO:0001666</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that results in a change in state or activity of a cell or an organism (in terms of movement, secretion, enzyme production, gene expression, etc.) as a result of a stimulus indicating lowered oxygen tension. Hypoxia, defined as a decline in O2 levels below normoxic levels of 20.8 - 20.95%, results in metabolic adaptation at both the cellular and organismal level. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> response to xenobiotic stimulus </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0009410" style="     ">GO:0009410</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that results in a change in state or activity of a cell or an organism (in terms of movement, secretion, enzyme production, gene expression, etc.) as a result of a stimulus from a xenobiotic, a compound foreign to the organim exposed to it. It may be synthesized by another organism (like ampicilin) or it can be a synthetic chemical. </td>
-   <td style="text-align:center;vertical-align:top;"> 8 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> cell differentiation </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0030154" style="     ">GO:0030154</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process in which relatively unspecialized cells, e.g. embryonic or regenerative cells, acquire specialized structural and/or functional features that characterize the cells, tissues, or organs of the mature organism or some other relatively stable phase of the organism's life history. Differentiation includes the processes involved in commitment of a cell to a specific fate and its subsequent development to the mature state. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> heart development </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007507" style="     ">GO:0007507</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process whose specific outcome is the progression of the heart over time, from its formation to the mature structure. The heart is a hollow, muscular organ, which, by contracting rhythmically, keeps up the circulation of the blood. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> immune response </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006955" style="     ">GO:0006955</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any immune system process that functions in the calibrated response of an organism to a potential internal or invasive threat. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> intracellular signal transduction </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0035556" style="     ">GO:0035556</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process in which a signal is passed on to downstream components within the cell, which become activated themselves to further propagate the signal and finally trigger a change in the function or state of the cell. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> positive regulation of cell population proliferation </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0008284" style="     ">GO:0008284</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that activates or increases the rate or extent of cell proliferation. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> spermatogenesis </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007283" style="     ">GO:0007283</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The developmental process by which male germ line stem cells self renew or give rise to successive cell types resulting in the development of a spermatozoa. </td>
-   <td style="text-align:center;vertical-align:top;"> 7 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> apoptotic process </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006915" style="     ">GO:0006915</a> </td>
-   <td style="text-align:left;vertical-align:top;"> A programmed cell death process which begins when a cell receives an internal (e.g. DNA damage) or external signal (e.g. an extracellular death ligand), and proceeds through a series of biochemical events (signaling pathway phase) which trigger an execution phase. The execution phase is the last step of an apoptotic process, and is typically characterized by rounding-up of the cell, retraction of pseudopodes, reduction of cellular volume (pyknosis), chromatin condensation, nuclear fragmentation (karyorrhexis), plasma membrane blebbing and fragmentation of the cell into apoptotic bodies. When the execution phase is completed, the cell has died. </td>
-   <td style="text-align:center;vertical-align:top;"> 6 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> chromatin remodeling </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006338" style="     ">GO:0006338</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Dynamic structural changes to eukaryotic chromatin occurring throughout the cell division cycle. These changes range from the local changes necessary for transcriptional regulation to global changes necessary for chromosome segregation. </td>
-   <td style="text-align:center;vertical-align:top;"> 6 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> homophilic cell adhesion via plasma membrane adhesion molecules </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007156" style="     ">GO:0007156</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The attachment of a plasma membrane adhesion molecule in one cell to an identical molecule in an adjacent cell. </td>
-   <td style="text-align:center;vertical-align:top;"> 6 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> negative regulation of cell migration </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0030336" style="     ">GO:0030336</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that stops, prevents, or reduces the frequency, rate or extent of cell migration. </td>
-   <td style="text-align:center;vertical-align:top;"> 6 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> positive regulation of cytosolic calcium ion concentration </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007204" style="     ">GO:0007204</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that increases the concentration of calcium ions in the cytosol. </td>
-   <td style="text-align:center;vertical-align:top;"> 6 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> axonogenesis </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007409" style="     ">GO:0007409</a> </td>
-   <td style="text-align:left;vertical-align:top;"> De novo generation of a long process of a neuron, including the terminal branched region. Refers to the morphogenesis or creation of shape or form of the developing axon, which carries efferent (outgoing) action potentials from the cell body towards target cells. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> cell cycle </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007049" style="     ">GO:0007049</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The progression of biochemical and morphological phases and events that occur in a cell during successive cell replication or nuclear replication events. Canonically, the cell cycle comprises the replication and segregation of genetic material followed by the division of the cell, but in endocycles or syncytial cells nuclear replication or nuclear division may not be followed by cell division. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> cell division </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0051301" style="     ">GO:0051301</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process resulting in division and partitioning of components of a cell to form more cells; may or may not be accompanied by the physical separation of a cell into distinct, individually membrane-bounded daughter cells. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> cell migration </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0016477" style="     ">GO:0016477</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The controlled self-propelled movement of a cell from one site to a destination guided by molecular cues. Cell migration is a central process in the development and maintenance of multicellular organisms. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> exocytosis </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006887" style="     ">GO:0006887</a> </td>
-   <td style="text-align:left;vertical-align:top;"> A process of secretion by a cell that results in the release of intracellular molecules (e.g. hormones, matrix proteins) contained within a membrane-bounded vesicle. Exocytosis can occur either by full fusion, when the vesicle collapses into the plasma membrane, or by a kiss-and-run mechanism that involves the formation of a transient contact, a pore, between a granule (for exemple of chromaffin cells) and the plasma membrane. The latter process most of the time leads to only partial secretion of the granule content. Exocytosis begins with steps that prepare vesicles for fusion with the membrane (tethering and docking) and ends when molecules are secreted from the cell. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> innate immune response </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0045087" style="     ">GO:0045087</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Innate immune responses are defense responses mediated by germline encoded components that directly recognize components of potential pathogens. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> microtubule cytoskeleton organization </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0000226" style="     ">GO:0000226</a> </td>
-   <td style="text-align:left;vertical-align:top;"> A process that is carried out at the cellular level which results in the assembly, arrangement of constituent parts, or disassembly of cytoskeletal structures comprising microtubules and their associated proteins. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> peptidyl-serine phosphorylation </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0018105" style="     ">GO:0018105</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The phosphorylation of peptidyl-serine to form peptidyl-O-phospho-L-serine. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> protein phosphorylation </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0006468" style="     ">GO:0006468</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process of introducing a phosphate group on to a protein. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> protein ubiquitination </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0016567" style="     ">GO:0016567</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process in which one or more ubiquitin groups are added to a protein. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> regulation of gene expression </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0010468" style="     ">GO:0010468</a> </td>
-   <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of gene expression. Gene expression is the process in which a gene's coding sequence is converted into a mature gene product or products (proteins or RNA). This includes the production of an RNA transcript as well as any processing to produce a mature RNA product or an mRNA or circRNA (for protein-coding genes) and the translation of that mRNA or circRNA into protein. Protein maturation is included when required to form an active form of a product from an inactive precursor form. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> skeletal system development </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0001501" style="     ">GO:0001501</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process whose specific outcome is the progression of the skeleton over time, from its formation to the mature structure. The skeleton is the bony framework of the body in vertebrates (endoskeleton) or the hard outer envelope of insects (exoskeleton or dermoskeleton). </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> transmembrane transport </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0055085" style="     ">GO:0055085</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The process in which a solute is transported across a lipid bilayer, from one side of a membrane to the other. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;vertical-align:top;"> visual perception </td>
-   <td style="text-align:center;vertical-align:top;"> <a href="http://amigo.geneontology.org/amigo/term/GO:0007601" style="     ">GO:0007601</a> </td>
-   <td style="text-align:left;vertical-align:top;"> The series of events required for an organism to receive a visual stimulus, convert it to a molecular signal, and recognize and characterize the signal. Visual stimuli are detected in the form of photons and are processed to form an image. </td>
-   <td style="text-align:center;vertical-align:top;"> 5 </td>
-  </tr>
-</tbody>
-</table>
-
-<br>
-
-#### **Различия в экспрессии генов до вакцинации vs. изменение экспрессии генов**
-
-<br>
-
-Дополнительно к сопоставлению наборов генов-находок со значимыми коэффициентами при основном эффекте и эффекте пересечения мы можем сопоставить соответствующие p-values для каждого гена - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
+Мы можем **сопоставить p-values при основном эффекте и эффекте пересечения** между ответом и временем анализа для каждого гена - например, с помощью диаграммы рассеяния: по оси X покажем p-value для основного эффекта ответа (оценки коэффициента $\beta_2$), по оси Y - для эффекта пересечения ответа со временем (оценки коэффициента $\beta_3$). Для большей наглядности будем использовать $-log_{10}$-преобразование для обоих p-values. В каждом квадранте, за исключением нижнего левого (сюда попадают гены, у которых оба коэффициента были статистически незначимыми), подпишем по 5 генов с наименьшими значениями из обоих p-values.
 
 
 ```r
@@ -1440,7 +1104,7 @@ ggplot(lmer_p_int_plt, aes(x = logp_b2, y = logp_b3)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_wrap(~ expr, nrow = 2, ncol = 2, repeat.tick.labels = TRUE) +
   labs(x = bquote(-log[10](p)~", response"), y = bquote(-log[10](p)~", response*time"), 
-       title = "Figure 5. P-values for regression coefficients estimates",
+       title = "Figure 3. P-values for regression coefficients estimates",
        subtitle = "Linear mixed models with the interaction term",
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1. The higher the axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -1455,7 +1119,197 @@ ggplot(lmer_p_int_plt, aes(x = logp_b2, y = logp_b3)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig5_p12-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig3_p12-1.png)<!-- -->
+
+Также мы можем посмотреть, **насколько пересекаются наборы генов-находок**, выявленных по статистической значимости коэффициентов в моделях с и без эффектов пересечения.
+
+
+```r
+upset_plt_df <- cbind(
+  gene = genes_maxvar$gene,
+  map_dfc(genes_sig[grepl("_b\\d$", names(genes_sig))], ~ genes_maxvar$gene %in% .x)) %>%
+  filter(if_any(-gene, ~.)) %>%
+  setNames(c("gene", genes_sig_lbls[names(.)[-1]]))
+
+upset_plot(upset_plt_df, rev(colnames(upset_plt_df)[-1]), 
+           c(darken("#A0CBE8"), rep("#A0CBE8", 2), darken("#F1CE63"), rep("#F1CE63", 2)),
+           "Figure 4. Intersection of gene sets with significant coefficients",
+           "Linear mixed models with and without the interaction term", FALSE, -0.3) +
+  labs(caption = "Models with the interaction term:\n sig. b2 (Baseline) = p < 0.05 for the coeff-t near the main effect of the response,\n sig. b3 (Change) = p < 0.05 for the coeff-t near the response * time interaction.\nModels without the interaction term:\n sig. b2 (Overall) = p < 0.05 coeff-t for the response.") +
+  theme(plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig4_upset_int_noint-1.png)<!-- -->
+
+<br>
+
+Из всех уникальных генов, для которых был статистически значим хотя бы один коэффициент в линейных смешанных моделях, **больше всего генов имели значимый коэффициент при эффекте пересечения ответа со временем** (независимо от способа представления данных по экспрессии). 
+
+
+```r
+# Genes with insignificant coefficient at baseline, but significant at change
+genes_sig_b3 <- genes_maxvar %>% 
+  filter(!init_int_b2 & !rank_int_b2 & (init_int_b3 | rank_int_b3))
+
+# Genes with significant coefficient at baseline, but insignificant at change
+genes_sig_b2 <- genes_maxvar %>% 
+  filter((init_int_b2 | rank_int_b2) & !init_int_b3 & !rank_int_b3)
+```
+
+Всего по результатам обоих подходов к спецификации экспрессии генов в линейных смешанных моделях нашлось **334 гена, для которых был значим основной эффект в одной из этих спецификаций и незначим эффект пересечения ни в одной из них**, а также **370 генов, для которых, наоборот, был значим эффект пересечения в одной из моделей, но не значим основной эффект ни в одной из них**. Можно считать, что средняя экспрессия генов первой группы значимо различалась между испытуемыми с разным уровнем ответа на вакцинацию до её проведения, но её динамика была для них схожей, а для второй группы генов, наоборот, изменение средней экспрессии после вакцинации значимо различалось в зависимости от ответа, хотя до вакцинации различий в средней экспрессии не было.
+
+С помощью базы Gene Ontology для каждого из этих наборов генов мы определили, в какие **сигнальные пути (биологические процессы)** входят их продукты, взяли по 15 путей с наибольшим числом генов, их представляющих, и на графике ниже представили результаты, дополнительно выделив те процессы, которые являются потомками процессов immune system process ([GO:0002376](https://www.ebi.ac.uk/QuickGO/term/GO:0002376)) или defense response ([GO:0006952](https://www.ebi.ac.uk/QuickGO/term/GO:0006952)) (на графике они обозначены как related to immune response).
+
+
+```r
+gobp_sig_b2 <- bp_genesF(genes_sig_b2)
+gobp_sig_b3 <- bp_genesF(genes_sig_b3)
+
+gobp_sig_b2b3_plot <- bind_rows(
+  gobp_sig_b2 %>% 
+    mutate(time = "Sig. b2 only\n(Baseline)"),
+  gobp_sig_b3 %>% 
+    mutate(time = "Sig. b3 only\n(Change)")) %>%
+  mutate(immresp = factor(GOBPID %in% gobp_immresp$GOBPID, labels = c("Not related to immune response", "Related to immune response"))) %>%
+  arrange(-n)
+
+g1 <- gobp_sig_b2b3_plot %>% filter(time == "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
+g2 <- gobp_sig_b2b3_plot %>% filter(time != "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
+
+gobp_sig_b2b3_plot <- gobp_sig_b2b3_plot %>% 
+  filter(GOBPID %in% c(g1,g2)) %>%
+  mutate(TERM = fct_reorder(factor(TERM), n))
+
+ggplot() +
+  geom_bar(aes(y = TERM, x = n, fill = immresp), gobp_sig_b2b3_plot, 
+           stat = "identity", width = 0.6) +
+  geom_vline(xintercept = 0) +
+  facet_grid(~ time, scales = "fixed") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = c("#76B7B2", "#F28E2B")) +
+  labs(y = element_blank(), fill = element_blank(),
+       x = "Number of genes with sig. coefficient",
+       title = "Figure 5. Biological processes (GO), represented by the largest number of\ngenes with significant coefficients",
+       subtitle = "Coefficients after linear mixed models") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        legend.justification = 1,
+        legend.key.size = unit(0.8, "lines"),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 11),
+        panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 11, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(size = 10))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig5_bps_b2b3-1.png)<!-- -->
+
+<br>
+
+Для моделей с эффектами пересечения мы также можем оценить **средний эффект воздействия (average treatment effect, ATE) ответа в отдельных точках исследования**. Ниже на графике покажем, насколько пересекаются наборы генов-находок между точками исследования (гены с p-value < 0.05 для соответствующего ATE).
+
+
+```r
+upset_plt_df_1 <- genes_maxvar %>%
+  select(contains("init_int_ame")) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(genes_sig_lbls[names(.)])
+
+upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
+           rep("#F1CE63", 4),
+           "Figure 6(1). Intersection of gene sets with significant ATEs,\nExpression as is",
+           "Linear mixed models with the interaction term", TRUE, -0.8)
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig6_upset_ame-1.png)<!-- -->
+
+```r
+upset_plt_df_2 <- genes_maxvar %>%
+  select(contains("rank_int_ame")) %>%
+  filter(if_any(everything(), ~.)) %>%
+  setNames(genes_sig_lbls[names(.)])
+
+upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
+           rep("#A0CBE8", 4),
+           "Figure 6(2). Intersection of gene sets with significant ATEs,\nRanks by expression",
+           "Linear mixed models with the interaction term", TRUE, -0.8)
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig6_upset_ame-2.png)<!-- -->
+
+Для относительно небольшого числа генов средний эффект воздействия ответа в отношении экспрессии является статистически значимым на всём протяжении исследования (от 0 до 7 дней). Также относительно невелико число генов, для которых ATE был статистически незначим до вакцинации, но был значимым с 1 по 7 дни, как и генов, для которых, наоборот значимость ATE до вакцинации сменилась на статистическую незначимость с 1 по 7 дней после неё. Но самое примечательное - 2 моды: **для наибольшего числа генов ATE стал значимым только к 7 дням после вакцинации, для следующего по количеству генов набора ATE был значим в 0-3 дня, но стал незначимым в 7 дней**.
+
+
+```r
+# Genes with insignificant ATE at 7d., but significant at 0-3 d.
+genes_sig_ame03 <- genes_maxvar %>% 
+  filter((!init_int_ame7 & !rank_int_ame7 & init_int_ame0 & init_int_ame1 & init_int_ame3) |
+           (!init_int_ame7 & !rank_int_ame7 & rank_int_ame0 & rank_int_ame1 & rank_int_ame3))
+
+# Genes with significant ATE at 7d., but insignificant at 0-3 d.
+genes_sig_ame7 <- genes_maxvar %>% 
+  filter((init_int_ame7 | rank_int_ame7) & 
+           !init_int_ame0 & !init_int_ame1 & !init_int_ame3 &
+           !rank_int_ame0 & !rank_int_ame1 & !rank_int_ame3)
+```
+
+Объедними результаты по моделям с исходными данными по экспрессии и с рангами генов по ней - получится, что для 310 генов ATE в 7 дней был значим в одной из этих моделей, но не значим ни в одной из них в 0-3 дня. Для 216 генов ATE был значим одновременно в 0-1-3 дня в любой из этих моделей и незначим в 7 дней ни в одной из них. Для каждого из этих наборов генов отберём по 15 наиболее представленных **биологических процессов**, в которых участвуют их продукты, и покажем их на графике ниже.
+
+
+```r
+gobp_sig_ame03 <- bp_genesF(genes_sig_ame03)
+gobp_sig_ame7 <- bp_genesF(genes_sig_ame7)
+
+gobp_sig_ame_plot <- bind_rows(
+  gobp_sig_ame03 %>% 
+    mutate(time = "Sig. at 0-3d. only"),
+  gobp_sig_ame7 %>% 
+    mutate(time = "Sig. at 7d. only")) %>%
+  mutate(immresp = factor(GOBPID %in% gobp_immresp$GOBPID, labels = c("Not related to immune response", "Related to immune response"))) %>%
+  arrange(-n)
+
+g1 <- gobp_sig_ame_plot %>% filter(time == "Sig. at 0-3d. only") %>% head(17) %>% pull(GOBPID)
+g2 <- gobp_sig_ame_plot %>% filter(time != "Sig. at 0-3d. only") %>% head(17) %>% pull(GOBPID)
+
+gobp_sig_ame_plot <- gobp_sig_ame_plot %>% 
+  filter(GOBPID %in% c(g1,g2)) %>%
+  mutate(TERM = fct_reorder(factor(TERM), n))
+
+ggplot() +
+  geom_bar(aes(y = TERM, x = n, fill = immresp), gobp_sig_ame_plot, 
+           stat = "identity", width = 0.6) +
+  geom_vline(xintercept = 0) +
+  facet_grid(~ time, scales = "fixed") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = c("#76B7B2", "#F28E2B")) +
+  labs(y = element_blank(), fill = element_blank(),
+       x = "Number of genes with sig. ATE",
+       title = "Figure 7. Biological processes (GO), represented by the largest number of\ngenes with significant ATEs",
+       subtitle = "ATEs after linear mixed models") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        legend.justification = 1,
+        legend.key.size = unit(0.8, "lines"),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 11, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(size = 10))
+```
+
+![](ImmunoSpace_SDY984_files/figure-html/fig7_bps_ame-1.png)<!-- -->
 
 <br>
 
@@ -1487,7 +1341,7 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_wrap(~ expr, nrow = 2, ncol = 2, repeat.tick.labels = TRUE, scales = "free_x") +
   labs(x = bquote("ATE for response" ~ (hat(beta[2]))), y = bquote(-log[10](p[hat(beta[2])])), 
-       title = "Figure 6. P-value vs. effect size for response",
+       title = "Figure 8. P-value vs. effect size for response",
        subtitle = "Linear mixed models without the interaction term",
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -1501,7 +1355,7 @@ ggplot(lmer_v_noint_plt, aes(x = estimate, y = logp)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig6_volcano-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig8_volcano-1.png)<!-- -->
 
 <br>
 
@@ -1527,7 +1381,7 @@ ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
-       title = "Figure 7. P-value vs. effect size for response",
+       title = "Figure 9. P-value vs. effect size for response",
        subtitle = "Average marginal effects after linear mixed models with the interaction term",
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -1542,7 +1396,9 @@ ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig7_volcano_time-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig9_volcano_time-1.png)<!-- -->
+
+<br>
 
 С одной стороны, визуально заметно некоторое "растягивание" точек вправо и влево к 7 дням от вакцинации, а с другой стороны, по отдельным генам, для которых разница в средней экспрессии до вакцинации между сильными и слабыми респондервами была наибольшей по абсолютной величине, заметно её уменьшение.
 
@@ -1550,11 +1406,7 @@ ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
 
 <br>
 
-#### **Биологические процессы (GO)**
-
-<br>
-
-С помощью базы Gene Ontology посмотрим, в какие биологические процессы входят продукты генов, для которых ATE оказался статистически значимым и большим по абсолютной величине, при этом назовем upregulated гены, для которых ATE > 0.25 для исходных данных по экспрессии генов, downregulated - для которых ATE < -0.25. Результаты для регрессий с рангами по экспрессии здесь учитывать не будем. Покажем на графиках ниже по 8 процессов с наибольшим числом генов из числа отобранных таким образом в каждой точке исследования.
+С помощью базы Gene Ontology посмотрим, **в какие биологические процессы входят продукты генов, для которых ATE оказался статистически значимым и большим по абсолютной величине**, при этом назовем upregulated гены, для которых ATE > 0.25 для исходных данных по экспрессии генов, downregulated - для которых ATE < -0.25. Результаты для регрессий с рангами по экспрессии здесь учитывать не будем. Покажем на графиках ниже результаты, полученные после отбора по 10 процессов с наибольшим числом генов в каждой точке исследования, выделив отдельно процессы, являющиеся потомками процессов immune system process или defense response.
 
 
 ```r
@@ -1567,86 +1419,99 @@ gobp_time <- bind_rows(
             mutate(reg = "-", time = as.numeric(str_extract(.x, "\\d"))))) %>%
   mutate(time = factor(time, timepoints, ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
 
-# gobp_time$GOBPID <- kableExtra::cell_spec(gobp_time$GOBPID, "html", link = sprintf("http://amigo.geneontology.org/amigo/term/%s", gobp_time$GOBPID))
-
 gobp_time_plot <- gobp_time %>%
   group_by(time, GOBPID) %>%
   summarise(term = unique(TERM), def = unique(def),
             n_up = n[reg == "+"], n_d = n[reg == "-"], n_sum = sum(n)) %>%
-  group_by(time) %>%
-  arrange(-n_sum) %>%
-  filter(row_number() <= 8) %>%
-  ungroup() %>%
-  group_by(GOBPID) %>%
-  mutate(n_sum = sum(n_sum)) %>%
-  ungroup() %>%
+  arrange(-n_sum)
+
+g1 <- map_dfr(levels(gobp_time_plot$time), ~ gobp_time_plot %>% filter(time == .x) %>% head(10)) %>%
+  pull(GOBPID) %>% unique()
+
+gobp_time_plot <- gobp_time_plot %>%
+  filter(GOBPID %in% g1) %>%
   pivot_longer(cols = c(n_up, n_d), names_to = "reg", values_to = "n") %>%
+  group_by(GOBPID) %>%
+  mutate(n_sum = sum(n)) %>%
+  ungroup() %>%
   mutate(reg = factor(reg, c("n_up", "n_d"), c("Upregulated", "Downregulated")),
-         term = fct_reorder(factor(str_wrap(term, 30)), n_sum))
+         term = fct_reorder(factor(str_wrap(term, 40)), n_sum),
+         immresp = factor(GOBPID %in% gobp_immresp$GOBPID, labels = c("Not related\nto imm.resp.", "Related to\nimm.resp.")))
 
 ggplot() +
   geom_bar(aes(y = term, x = n, fill = reg), gobp_time_plot, 
            stat = "identity", position = "stack", width = 0.6) +
   geom_hline(aes(yintercept = y), data.frame(y = c(1:20) + 0.5), color = "grey50") +
   geom_vline(xintercept = 0) +
-  facet_grid(~ time, scales = "fixed") +
+  facet_grid(immresp ~ time, scales = "free_y", space = "free_y", switch = "y") +
   scale_x_continuous(expand = c(0,0)) +
   scale_fill_manual(values = c("#499894", "#EDC948")) +
   labs(y = element_blank(), fill = element_blank(),
        x = "Number of genes with big significant ATE",
-       title = "Figure 8. Biological processes (GO), represented by the largest number of\ngenes with largest significant ATEs, by time",
+       title = "Figure 10. Biological processes (GO), represented by the largest number of\ngenes with the largest significant ATEs",
        subtitle = "ATEs after linear mixed models") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
+        legend.key.size = unit(0.8, "lines"),
         axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 11),
         panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
         panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
         panel.grid.major.y = element_blank(),
         panel.grid.minor.y = element_blank(),
         strip.background = element_blank(),
         strip.text = element_text(size = 12, color = "black", face = "bold"),
+        strip.placement = "outside",
         panel.spacing = unit(1, "lines"),
         plot.title = element_text(size = 13, face = "bold"),
         plot.title.position = "plot",
         plot.subtitle = element_text(size = 10))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig8_bps_change-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig10_bps_big-1.png)<!-- -->
 
 <br>
 
-То же самое - для процессов, в названии которых есть слово "immune":
+А теперь отдельно только **для процессов, являющихся потомками immune system process или defense response** (с предварительным отбором до 15 наиболее представленных процессов в каждой точке):
 
 
 ```r
-gobp_time_plot <- gobp_time %>%
-  filter(grepl("immune", TERM)) %>%
+gobp_imm_time_plot <- gobp_time %>%
+  filter(GOBPID %in% gobp_immresp$GOBPID) %>%
   group_by(time, GOBPID) %>%
   summarise(term = unique(TERM), def = unique(def),
             n_up = n[reg == "+"], n_d = n[reg == "-"], n_sum = sum(n)) %>%
-  group_by(GOBPID) %>%
-  mutate(n_sum = sum(n_sum)) %>%
-  ungroup() %>%
+  arrange(-n_sum)
+
+g1 <- map_dfr(levels(gobp_imm_time_plot$time), ~ gobp_imm_time_plot %>% filter(time == .x) %>% head(15)) %>%
+  pull(GOBPID) %>% unique()
+
+gobp_imm_time_plot <- gobp_imm_time_plot %>%
+  filter(GOBPID %in% g1) %>%
   pivot_longer(cols = c(n_up, n_d), names_to = "reg", values_to = "n") %>%
+  group_by(GOBPID) %>%
+  mutate(n_sum = sum(n)) %>%
+  ungroup() %>%
   mutate(reg = factor(reg, c("n_up", "n_d"), c("Upregulated", "Downregulated")),
-         term = fct_reorder(factor(str_wrap(term, 30)), n_sum)) %>%
-  arrange(-n)
+         term = fct_reorder(factor(str_wrap(term, 50)), n_sum))
 
 ggplot() +
-  geom_bar(aes(y = term, x = n, fill = reg), gobp_time_plot, 
+  geom_bar(aes(y = term, x = n, fill = reg), gobp_imm_time_plot, 
            stat = "identity", position = "stack", width = 0.6) +
-  geom_hline(aes(yintercept = y), data.frame(y = c(1:20) + 0.5), color = "grey50") +
+  geom_hline(aes(yintercept = y), data.frame(y = c(1:length(unique(gobp_imm_time_plot$GOBPID))) + 0.5), color = "grey50") +
   geom_vline(xintercept = 0) +
   facet_grid(~ time, scales = "fixed") +
   scale_x_continuous(expand = c(0,0)) +
   scale_fill_manual(values = c("#499894", "#EDC948")) +
   labs(y = element_blank(), fill = element_blank(),
        x = "Number of genes with big significant ATE",
-       title = "Figure 9. Immune-related biological processes (GO), represented by the largest number of\ngenes with largest significant ATEs, by time",
+       title = "Figure 11. Immune-related biological processes (GO), represented by the largest number of\ngenes with the largest significant ATEs",
        subtitle = "ATEs after linear mixed models") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
+        legend.key.size = unit(0.8, "lines"),
         axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 11),
         panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
         panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
         panel.grid.major.y = element_blank(),
@@ -1659,7 +1524,7 @@ ggplot() +
         plot.subtitle = element_text(size = 10))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig9_bps_change_imm-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig11_bps_big_imm-1.png)<!-- -->
 
 <br>
 
@@ -1680,7 +1545,7 @@ df_expr_wide_fin <- df_expr_long_fin %>%
 
 <br>
 
-Для каждого гена из ранее отобранных 5 тыс. оценим логистическую регрессию вида:
+Для каждого гена из ранее отобранных 5 тыс. оценим **логистическую регрессию вида**:
 
 $log(odds(response_{i})) = \gamma_0 + \gamma_1*expr_{0i} + \gamma_2*expr_{1i} + \gamma_3*expr_{3i} + \gamma_4*expr_{7i}$, где:
 
@@ -1790,7 +1655,7 @@ genes_sig_logreg_lbls <- sprintf("%s, sig.OR (%s)",
 
 <br>
 
-Ниже на графиках покажем, насколько пересекаются наборы генов-находок, выявленных по статистической значимости коэффициентов при переменных для экспрессии в разных точках исследования в логистических регрессиях.
+Ниже на графиках покажем, **насколько пересекаются наборы генов-находок**, выявленных по статистической значимости коэффициентов при переменных для экспрессии в разных точках исследования в логистических регрессиях.
 
 
 ```r
@@ -1806,11 +1671,11 @@ upset_plt_df_1 <- genes_maxvar %>%
 
 upset_plot(upset_plt_df_1, rev(colnames(upset_plt_df_1)), 
            rep("#F1CE63", 4),
-           "Figure 10(1). Intersection of gene sets with significant ORs,\nExpression as is",
+           "Figure 12(1). Intersection of gene sets with significant ORs,\nExpression as is",
            "Logistic regressions for the (strong) response", TRUE, -0.8)
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig10_upset_logreg-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig12_upset_logreg-1.png)<!-- -->
 
 ```r
 upset_plt_df_2 <- genes_maxvar %>%
@@ -1820,13 +1685,13 @@ upset_plt_df_2 <- genes_maxvar %>%
 
 upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)), 
            rep("#A0CBE8", 4),
-           "Figure 10(2). Intersection of gene sets with significant ORs,\nRanks by expression",
+           "Figure 12(2). Intersection of gene sets with significant ORs,\nRanks by expression",
            "Logistic regressions for the (strong) response", TRUE, -0.8)
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig10_upset_logreg-2.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig12_upset_logreg-2.png)<!-- -->
 
-Также может быть интересно сопоставить для каждой точки исследования набор генов со значимым средним эффектом ответа на экспрессию с набором генов со значимым отношением шансов ответа при увеличении экспрессии гена на 1 - результаты на графиках ниже:
+Также может быть интересно **сопоставить для каждой точки исследования набор генов со значимым средним эффектом ответа на экспрессию с набором генов со значимым отношением шансов ответа при увеличении экспрессии гена на 1** - результаты на графиках ниже:
 
 
 ```r
@@ -1849,11 +1714,11 @@ p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
                  element_blank(), "Ranks by expression", TRUE, 0.4, 2)
 
 p12 <- ggarrange(p1, p2, nrow = 2)
-annotate_figure(p12, top = text_grob("Figure 11(1). Intersection of gene sets with significant ATEs and ORs, Baseline",
+annotate_figure(p12, top = text_grob("Figure 13(1). Intersection of gene sets with significant ATEs and ORs, Baseline",
                                      face = "bold", size = 12, hjust = 0.5))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig11_compmodels-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig13_compmodels-1.png)<!-- -->
 
 ```r
 upset_plt_df_1 <- genes_maxvar %>%
@@ -1875,11 +1740,11 @@ p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
                  element_blank(), "Ranks by expression", TRUE, 0.2, 2)
 
 p12 <- ggarrange(p1, p2, nrow = 2)
-annotate_figure(p12, top = text_grob("Figure 11(2). Intersection of gene sets with significant ATEs and ORs, 1 day",
+annotate_figure(p12, top = text_grob("Figure 13(2). Intersection of gene sets with significant ATEs and ORs, 1 day",
                                      face = "bold", size = 12, hjust = 0.5))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig11_compmodels-2.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig13_compmodels-2.png)<!-- -->
 
 ```r
 upset_plt_df_1 <- genes_maxvar %>%
@@ -1901,11 +1766,11 @@ p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
                  element_blank(), "Ranks by expression", TRUE, 0.2, 2)
 
 p12 <- ggarrange(p1, p2, nrow = 2)
-annotate_figure(p12, top = text_grob("Figure 11(3). Intersection of gene sets with significant ATEs and ORs, 3 days",
+annotate_figure(p12, top = text_grob("Figure 13(3). Intersection of gene sets with significant ATEs and ORs, 3 days",
                                      face = "bold", size = 12, hjust = 0.5))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig11_compmodels-3.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig13_compmodels-3.png)<!-- -->
 
 ```r
 upset_plt_df_1 <- genes_maxvar %>%
@@ -1927,11 +1792,11 @@ p2 <- upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
                  element_blank(), "Ranks by expression", TRUE, 0.2, 2)
 
 p12 <- ggarrange(p1, p2, nrow = 2)
-annotate_figure(p12, top = text_grob("Figure 11(4). Intersection of gene sets with significant ATEs and ORs, 7 days",
+annotate_figure(p12, top = text_grob("Figure 13(4). Intersection of gene sets with significant ATEs and ORs, 7 days",
                                      face = "bold", size = 12, hjust = 0.5))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig11_compmodels-4.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig13_compmodels-4.png)<!-- -->
 
 Видим, что наборы, найденные с помощью двух разных подходов, относительно слабо пересекаются друг с другом до вакцинации и в 1-3 дня после неё - и только в 7 дней пересечение становится заметным.
 
@@ -1941,9 +1806,9 @@ annotate_figure(p12, top = text_grob("Figure 11(4). Intersection of gene sets wi
 
 <br>
 
-Размер эффекта экспрессии гена в отношении вероятности сильного ответа на вакцинацию можно оценить с помощью отношения шансов (экспонированного значения коэффициента логистической регрессии при переменной для экспрессии в соответствующей точке исследования).
+Размер эффекта экспрессии гена в отношении вероятности сильного ответа на вакцинацию можно оценить с помощью **отношения шансов** (экспонированного значения коэффициента логистической регрессии при переменной для экспрессии в соответствующей точке исследования).
 
-Ниже на volcano plot сопоставим статистическую значимость эффекта с его размером, для чего по оси Y покажем значение $-log_{10}$-преобразования p-value, а по оси X $log_{10}$ оценки отношения шансов сильного ответа при увеличении соответствующей переменной для экспрессии на 1 (для удобства отображения заменим $log_{10}$ отношения шансов в регрессиях с исходными данными по экспрессии за пределами интервала [-10, 10] на ближайшую из границ этого интервала, в регрессиях для рангов по экспрессии сделаем то же самое по интервалу [-4, 4] - на графиках видно, что все гены, на отображение которых это повлияло, имели статистически незначимые коэффициенты при соответствующих переменных). Оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями отношений шансов.
+Ниже на volcano plot **сопоставим статистическую значимость эффекта с его размером**, для чего по оси Y покажем значение $-log_{10}$-преобразования p-value, а по оси X $log_{10}$ оценки отношения шансов сильного ответа при увеличении соответствующей переменной для экспрессии на 1 (для удобства отображения заменим $log_{10}$ отношения шансов в регрессиях с исходными данными по экспрессии за пределами интервала [-10, 10] на ближайшую из границ этого интервала, в регрессиях для рангов по экспрессии сделаем то же самое по интервалу [-4, 4] - на графиках видно, что все гены, на отображение которых это повлияло, имели статистически незначимые коэффициенты при соответствующих переменных). Оранжевым выделим по 5 генов с p-value < 0.05 и самыми низкими и самыми высокими значениями отношений шансов.
 
 
 ```r
@@ -1970,7 +1835,7 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = bquote(log[10](OR)), y = bquote(-log[10](p[OR])), 
-       title = "Figure 12. P-value vs. size of gene expression's effect on response",
+       title = "Figure 14. P-value vs. size of gene expression's effect on response",
        subtitle = bquote(log[10]~"odds ratios after logistic regressions for the (strong) response"),
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -1985,7 +1850,7 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
         plot.caption = element_text(size = 10, color = "black", face = "italic", hjust = 0))
 ```
 
-![](ImmunoSpace_SDY984_files/figure-html/fig12_volcano_or-1.png)<!-- -->
+![](ImmunoSpace_SDY984_files/figure-html/fig14_volcano_or-1.png)<!-- -->
 
 <br>
 
@@ -1995,14 +1860,14 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
 
 Выше мы уже использовали базу Gene Ontology (GO) для определения аннотаций биологических процессов, в которых участвуют белковые продукты генов, дифференциально экспрессированных у испытуемых с разным уровнем ответа на вакцинацию. Однако поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, какие именно биологические процессы "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа (в нашем случае 5 тыс.). 
 
-В своём исследовании мы будем выявлять такие процессы, основываясь на оценке p-values гипергеометрического распределения, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
+В своём исследовании мы будем выявлять такие процессы, основываясь на оценке **p-values гипергеометрического распределения**, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
 где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
 
 В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). 
 
 После оценки гипергеометрического теста исключим выявленные в нём биологические процессы, в которых вошло менее 5 генов из числа значимых - далее будем работать с p-values по оставшимся процессам.
 
-Для контроля FDR мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+Для **контроля FDR** мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
 
 SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей и логистических регрессий.
 
@@ -2087,7 +1952,7 @@ saveRDS(hg_res_pq, "OlgaMironenko/res/hg_res_pq.rds")
 
 
 
-Ниже для каждого набора значимых генов, выявленного нами по результатам оценки линейных смешанных моделей и логистических регрессий, покажем количество "перепредставленных" этим набором биологических процессов при разных пороговых значениях для скорректированных p-values и для q-values (пустая ячейка означает отсутствие процессов, удовлетворяющих соответствующему критерию).
+Ниже для каждого набора значимых генов, выявленного нами по результатам оценки линейных смешанных моделей и логистических регрессий, покажем **количество "перепредставленных" этим набором биологических процессов при разных пороговых значениях для скорректированных p-values и для q-values** (пустая ячейка означает отсутствие процессов, удовлетворяющих соответствующему критерию).
 
 
 ```r
@@ -2383,11 +2248,11 @@ imap_dfr(
 
 Видим, что, в основном, перепредставленные процессы обнаруживаются до вакцинации или в 1 день после неё.
 
-В таблице ниже перечислим все процессы с q-value < 0.05, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели.
+В таблице ниже перечислим все **процессы с q-value < 0.05**, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели. Среди них нет ни одного, который бы являлся потомков процессов immune system process или defense response.
 
 
 ```r
-imap_dfr(
+gobp_overrep <- imap_dfr(
   hg_res_pq,
   ~ .x %>% filter(qvalue < 0.05) %>% 
     transmute(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]], 
@@ -2395,11 +2260,15 @@ imap_dfr(
   mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]")) %>%
   transmute(time, GOID, TERM, DEFINITION) %>%
   unique() %>%
-  arrange(time, GOID) %>%
+  arrange(time, GOID)
+
+g1 <- which(gobp_overrep$GOID %in% gobp_immresp$GOBPID)
+
+gobp_overrep %>%
   kable(align = "lcll",
         col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
         caption = "<b>Table 6. Overrepresented BPs, by time</b>") %>%
-  kableExtra::row_spec(0, bold = TRUE) %>%
+  kableExtra::row_spec(c(0, g1), bold = TRUE) %>%
   kableExtra::column_spec(1:4, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
                             html_font = "\"Source Sans Pro\", helvetica, sans-serif")
