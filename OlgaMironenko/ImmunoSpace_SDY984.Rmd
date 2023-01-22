@@ -1,6 +1,6 @@
 ---
-title: '**ImmuneSpace: study SDY984**'
-subtitle: '**Genes expression under varicella zoster vaccine**'
+title: '**Identification of genes associated with immune response using open database ImmuneSpace**'
+subtitle: '**Study SDY984 (immune response after varicella zoster vaccine)**'
 author: "Мироненко Ольга"
 date: "`r Sys.Date()`"
 output:
@@ -13,6 +13,8 @@ output:
     keep_md: true
 editor_options:
   chunk_output_type: console
+bibliography: biblio.bib
+link-citations: yes
 # runtime: shiny
 ---
 
@@ -151,6 +153,15 @@ bp_genesF <- function(df) {
     arrange(-n)
 }
 
+# Function to add an image with link
+
+image_link <- function(image, url,...){
+  htmltools::a(
+    href = url,
+    htmltools::img(src = image,...)
+    )
+}
+
 # Данные https://www.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2
 
 # all_noNorm_withResponse_eset <- readRDS("data/all_noNorm_withResponse_eset.Rds")
@@ -217,9 +228,14 @@ df_expr <- df_expr %>%
 df_expr_long <- df_expr %>%
   pivot_longer(A1BG:last_col(), names_to = "gene", values_to = "expr")
 
-# All offsprings for GO BP = immune system process | defense response
+# All offsprings for GO BP = immune system process | defense response | 
+# cytokine production | response to cytokine | MHC
 gobp_immresp <- tibble(
-  GOBPID = c("GO:0002376", GO.db::GOBPOFFSPRING[["GO:0002376"]], "GO:0006952", GO.db::GOBPOFFSPRING[["GO:0006952"]]),
+  GOBPID = c("GO:0002376", GO.db::GOBPOFFSPRING[["GO:0002376"]], 
+             "GO:0006952", GO.db::GOBPOFFSPRING[["GO:0006952"]],
+             "GO:0001816", GO.db::GOBPOFFSPRING[["GO:0001816"]],
+             "GO:0034097", GO.db::GOBPOFFSPRING[["GO:0034097"]],
+             "GO:0002396", GO.db::GOBPOFFSPRING[["GO:0002396"]]),
   TERM = AnnotationDbi::Term(GOBPID)) %>%
   unique()
 ```
@@ -228,25 +244,97 @@ gobp_immresp <- tibble(
 
 <br>
 
-В данном отчёте будут представлены результаты анализа данных по экспрессии генов среди добровольцев, прошедших **вакцинацию от varicella zoster живой ослабленной вакциной Zostavax**. Данные были получены в рамках исследования [SDY984](https://www.immport.org/shared/study/SDY984) по программе [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) и выложены на страничке [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (доступны для скачивания после регистрации).
+В данном исследовательском проекте будут представлены результаты анализа данных по экспрессии генов среди добровольцев, прошедших **вакцинацию от varicella zoster живой ослабленной вакциной Zostavax**. Данные были получены в рамках исследования [SDY984](https://www.immport.org/shared/study/SDY984) по программе [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) и выложены на страничке [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (доступны для скачивания после регистрации). Результаты оригинального исследования по полной базе данных были опубликованы в статье [@li_metabolic_2017].
 
-**Задача нашего исследовательского проекта** - определить, динамика экспрессии каких именно генов связана с иммунным ответом на вакцинацию и в какие сигнальные пути входят эти гены. Эту задачу можно решать двояко: 
+**Задача нашего исследовательского проекта** - определить, динамика экспрессии каких именно генов связана с иммунным ответом на вакцинацию и в какие сигнальные пути входят продукты этих генов. Первую часть этой задачи можно решать двояко: 
 
-- с помощью оценки различий в экспрессии генов между испытуемыми, ответившими и не ответившими на вакцинацию, 
+- с помощью оценки различий в экспрессии генов между испытуемыми с разным уровнем ответа на вакцинацию, 
 
 - с помощью оценки взаимосвязи между экспрессией генов (и её динамикой) и итоговым ответом на вакцинацию.
 
 <br>
 
-Представление о функции генов можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: [аннотация](https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html) о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты генов-находок (генов с дифференциальной экспрессией для групп испытуемых с разной силой ответа на вакцинацию или генов, экспрессия которых окажется значимым образом связанной с ответом).
+**Процесс генерации иммунного ответа на вакцинацию** может быть схематично описан следующим образом [@pollard_guide_2021]:
+
+```{r i1, echo=FALSE, out.width = '100%'}
+knitr::include_graphics(file.path("..", "OlgaMironenko", "images", "ImmResp_Vacc1.jpg"))
+```
+
+<br>
+
+Или так [@desmet_nucleic_2012]:
+
+```{r i2, echo=FALSE, out.width = '100%'}
+knitr::include_graphics(file.path("..", "OlgaMironenko", "images", "ImmResp_Vacc2.jpg"))
+```
+
+<br>
+
+Вакцина может содержать молекулярные паттерны, ассоциированные с патогеном (PAMPs), или спровоцировать локальную реакцию в виде высвобождения молекулярных паттернов, ассоциированных с повреждением (DAMPs). Эти паттерны распознаются рецепторами распознавания образов (PRRs), экспрессируемых клетками, являющимися частью системы **врождённого иммунитета**: макрофагами, тучными клетками, нейтрофилами, дендритными клетками (DCs). Эти клетки призваны не определить, с чем именно - с какой именно инфекцией или иным патогеном - столкнулся организм, а, в зависимости от того, о каких клетках идёт речь, уничтожить или поглотить патоген, расщепить его на фрагменты и/ или просигнализировать клеткам адаптивного иммунитета о том, что организм с ним столкнулся. Система **адаптивного иммунитета** уже будет работать на то, чтобы сформировать/ задействовать специфичный, прицельный иммунный ответ именно на данный патоген, в частности, в виде выработки специфических антител к нему. 
+
+Также в рамках врождённого иммунитета PAMPs и DAMPs могут распознаваться и лимфоидными клетками (например, NK-клетками), которые в ответ на это продуцируют цитокины, участвующие, в том числе, в активации и ориентации дендритных клеток, играющих основную роль в передаче сигнала от системы врождённого к системе адаптивного иммунного ответа. После активации дендритные клетки мигрируют в лимфатические узлы, где презентируют фрагменты поглощенного антигена T-клеткам через специальный механизм костимуляции рецепторов T-клеток (TCR), в процессе которой одни T-клетки (T-киллеры, или CD8+ лимфоциты) взаимодействуют с молекулами главного комплекса гистосовместимости первого типа (MCH-I) и при обнаружении чужеродных MHC-I выделяют белки, растворяющие патоген, а другие (T-хелперы, или CD4+ лимфоциты) взаимодействуют с молекулами второго типа (MHC-II) и при обранужении чужеродных MCH-II продуцируют хемокины и цитокины. В зависимости от цитокиновой среды CD4+ лимфоциты могут дифференцироваться в различные подтипы T-хелперов (Th), а также T-фолликулярные хелперы (Tfh) - последние активируют B-клетки, в процессе дифференцировки которых образуются плазматические клетки, вырабатывающие антиген-специфические антитела. В процессе дифференцировки B-клеток и CD8+ лимфоцитов также будут образовываться клетки памяти, что позволит иммунной системе в дальнейшем быстрее распознавать и реагировать на контакт с уже знакомым патогеном.
+
+Описанная схема формирования иммунного ответа даёт примерное представление о том, какие биологические процессы она задействует. 
+
+<br>
+
+Что касается участия продуктов определенных генов в этих процессах, то представление о нём можно получить из **[Gene Ontology (GO)](http://geneontology.org/)** - специальной базы знаний, в которой хранится наиболее актуальная и полная на сегодняшний день информация в данной области, а именно: аннотация о молекулярных функциях белковых продуктов генов, биологических процессах, частью которых являются эти функции, и компонентах клеток, в которых продукты гена эти функции выполняют. В нашем исследовании нас будут интересовать, прежде всего, биологические процессы, в которых участвуют продукты генов-находок (генов с дифференциальной экспрессией для групп испытуемых с разной силой ответа на вакцинацию или генов, экспрессия которых окажется значимым образом связанной с ответом).
+
+Дополнительно мы будем выделять те **сигнальные пути, которые непосредственно связаны с формированием иммунного ответа** на вакцинацию, а именно: процессы, являющиеся потомками следующих биологических процессов (на рисунках ниже показаны только "дети" соответствующих процессов):
+
+- immune system process ([GO:0002376](https://www.ebi.ac.uk/QuickGO/term/GO:0002376)) - any process involved in the development or functioning of the immune system, an organismal system for calibrated responses to potential internal or invasive threats.
+
+```{r i3, echo=FALSE, out.width = '100%'}
+image_link(file.path("..", "OlgaMironenko", "images", "GO_0002376.png"),
+           "https://raw.githubusercontent.com/ejeej/ImmuneSpace_SDY984/main/OlgaMironenko/images/GO_0002376.png")
+```
+
+- defense response ([GO:0006952](https://www.ebi.ac.uk/QuickGO/term/GO:0006952)) - reactions, triggered in response to the presence of a foreign body or the occurrence of an injury, which result in restriction of damage to the organism attacked or prevention/recovery from the infection caused by the attack.  
+
+```{r i4, echo=FALSE, out.width = '100%'}
+image_link(file.path("..", "OlgaMironenko", "images", "GO_0006952.png"),
+           "https://raw.githubusercontent.com/ejeej/ImmuneSpace_SDY984/main/OlgaMironenko/images/GO_0006952.png")
+```
+
+- cytokine production ([GO:0001816](https://www.ebi.ac.uk/QuickGO/term/GO:0001816)) - appearance of a cytokine due to biosynthesis or secretion following a cellular stimulus, resulting in an increase in its intracellular or extracellular levels. 
+
+```{r i5, echo=FALSE, out.width = '100%'}
+image_link(file.path("..", "OlgaMironenko", "images", "GO_0001816.png"),
+           "https://raw.githubusercontent.com/ejeej/ImmuneSpace_SDY984/main/OlgaMironenko/images/GO_0001816.png")
+```
+
+- response to cytokine ([GO:0034097](https://www.ebi.ac.uk/QuickGO/term/GO:0034097)) - any process that results in a change in state or activity of a cell or an organism (in terms of movement, secretion, enzyme production, gene expression, etc.) as a result of a cytokine stimulus.
+
+```{r i6, echo=FALSE, out.width = '100%'}
+image_link(file.path("..", "OlgaMironenko", "images", "GO_0034097.png"),
+           "https://raw.githubusercontent.com/ejeej/ImmuneSpace_SDY984/main/OlgaMironenko/images/GO_0034097.png")
+```
+
+- MHC protein complex assembly ([GO:0002396](https://www.ebi.ac.uk/QuickGO/term/GO:0002396)) - the aggregation, arrangement and bonding together of a set of components to form an MHC protein complex.
+
+<center>
+```{r i7, echo=FALSE}
+image_link(file.path("..", "OlgaMironenko", "images", "GO_0002396.png"),
+           "https://raw.githubusercontent.com/ejeej/ImmuneSpace_SDY984/main/OlgaMironenko/images/GO_0002396.png", 
+           style = 'float:center;width:30%')
+```
+</center>
+
+<br>
+
+Понятно, что иммунный ответ задействует и другие сигнальные пути, помимо обозначенных, например, процессы, связанные с активацией клеток, их диффференцировкой, межклеточными взаимодействиями и т.п., но эти процессы могут происходить в организме и не в связи с вакцинацией, поэтому мы будем обращать на них внимание, но не будем относить к группе непосредственно связанных с иммуным ответом.
 
 <br>
 
 В выбранном нами исследовании **экспрессия генов** оценивалась у `r length(unique(df_subj$participant_id))` добровольцев до вакцинации и в нескольких точках (`r paste(timepoints[timepoints>0], collapse = ", ")` дней) после неё. 
 
-Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался **ответ на вакцинацию** с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40. MFC - это maximum fold change (максимальная кратность изменения) для титра антител после вакцинации по сравнению с состоянием до неё (максимальная - поскольку [некоторые вакцины в исследовании содержали несколько штаммов вируса и/или титр антител для них определялся с помощью нескольких тестов](https://www.nature.com/articles/s41590-022-01329-5)). В исследовании, с данными которого мы будем работать, штамм был один и титр антител измерялся с помощью одной методики - оценки уровня IgG методом ELISA (enzyme-linked immunosorbent assay, или иммуноферментный анализ, ИФА), поэтому в данном случае MFC фактически равна просто кратности изменения титра антител (формально это $log_2(FC)$). Что касается разбивки на группы по ответу, то оно [производилось по перцентилям полученного значения для MFC](https://www.nature.com/articles/s41590-022-01329-5), а именно: для MFC_p40 все испытуемые, у кого MFC был меньше или равен 40-му перцентилю, считались low responder'ами, с MFC, равным или большим 60-го перцентиля - high responder'ами, остальные - moderate responder'ами (детали можно найти, в том числе, в [функциях](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R), которые использовались для получения того датасета, с которым мы работаем).
+Также по завершении исследования (через `r unique(df_subj$ImmResp_postVax_timepoint_MFC)` дней от начала) оценивался **ответ на вакцинацию** с разбиением испытуемых на 3 группы: low, moderate и high responder. Разбиение проводилось отдельно по нескольким критериям, но мы для определения статуса по ответу на вакцинацию будем использовать только MFC_p40. MFC - это maximum fold change (максимальная кратность изменения) для титра антител после вакцинации по сравнению с состоянием до неё (максимальная - поскольку некоторые вакцины в исследовании содержали несколько штаммов вируса и/или титр антител для них определялся с помощью нескольких тестов [@fourati_pan-vaccine_2022]). В исследовании, с данными которого мы будем работать, штамм был один и титр антител измерялся с помощью одной методики - оценки уровня IgG методом ELISA (enzyme-linked immunosorbent assay, или иммуноферментный анализ, ИФА), поэтому в данном случае MFC фактически равна просто кратности изменения титра антител (формально это $log_2(FC)$). Что касается разбивки на группы по ответу, то оно производилось по перцентилям полученного значения для MFC [@fourati_pan-vaccine_2022], а именно: для MFC_p40 все испытуемые, у кого MFC был меньше или равен 40-му перцентилю, считались low responder'ами, с MFC, равным или большим 60-го перцентиля - high responder'ами, остальные - moderate responder'ами (детали можно найти, в том числе, в [функциях](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R), которые использовались для получения того датасета, с которым мы работаем).
 
 В целях упрощения в рамках нашего исследовательского проекта мы исключим из анализа испытуемых с moderate ответом на вакцинацию (`r sum(df_subj$MFC_p40 == "moderateResponder" & df_subj$study_time_collected == 0)` чел.), а также, на начальном этапе, не будем делать разбивку в зависимости от ветви исследования (возрастной группы испытуемых).
+
+<br>
+
+В **оригинальном исследовании** [@li_metabolic_2017] использовался больший по сравнению с доступным нам объём данных (и по количеству испытуемых, и по количеству показателей, в том числе касающихся метаболомики и проточной цитометрии, и по числу точек оценки последних) и решался более широкий спектр задач с несколько отличающимся от нашего акцентом, а именно: оценка взаимосвязи между изменениями метаболических показателей с изменениями экспрессии генов и их отдельных модулей на протяжении периода до 180 дней после вакцинации. Соответственно, авторам удалось более детально описать механизм ответа на рассматриваемую вакцину, без его дихотомизации. В своём исследовательском проекте мы ставим более узкую задачу - выявить гены, дифференциально экспрессированные у испытуемых с сильным и слабым ответом на вакцинацию или экспрессия которых связана (положительно или отрицательно) с вероятностью сильного ответа, а также те сигнальные пути, в которых задйствованы продукты этих генов.
 
 <br>
 
@@ -407,7 +495,7 @@ genes_sig_mw <- AnnotationDbi::select(org.Hs.eg.db::org.Hs.eg.db, mwtest_p$gene[
                                       c("GENENAME", "GO"), "SYMBOL") %>% 
   filter(ONTOLOGY == "BP") %>%
   mutate(TERM = AnnotationDbi::Term(GO), DEFINITION = AnnotationDbi::Definition(GO)) %>%
-  select(SYMBOL, GENENAME, TERM, DEFINITION) %>%
+  dplyr::select(SYMBOL, GENENAME, TERM, DEFINITION) %>%
   unique()
 
 tbl_summary(
@@ -499,9 +587,9 @@ ggplot(df_expr_long_fin %>% filter(gene %in% mwtest_p$gene[mwtest_p$p_adj < 0.05
 
 <br>
 
-[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это `r genes_sig_mw$GENENAME[genes_sig_mw$gene == "IL2RA"][1]` ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2), участвующий в регулировании активности лейкоцитов, отвечающих за иммунитет. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$gene == "IL2RA"], collapse = "; ")`.
+[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) - это `r genes_sig_mw$GENENAME[genes_sig_mw$SYMBOL == "IL2RA"][1]` ген, который кодирует белок Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2), участвующий в регулировании активности лейкоцитов, отвечающих за иммунитет. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$SYMBOL == "IL2RA"], collapse = "; ")`.
 
-[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это `r genes_sig_mw$GENENAME[genes_sig_mw$gene == "RIC3"][1]` ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$gene == "RIC3"], collapse = "; ")`.
+[**RIC3**](https://en.wikipedia.org/wiki/RIC3) - это `r genes_sig_mw$GENENAME[genes_sig_mw$SYMBOL == "RIC3"][1]` ген, который кодирует chaperon белок RIC-3, отвечающий за резистентность к ингибиторам cholinesterase 3. [Chaperon белки](https://en.wikipedia.org/wiki/Chaperone_(protein)) участвуют в сворачивании или разворачивании крупных белков или макромолекулярных белковых комплексов. Все биологические процессы, в которых участвуют белковые продукты данного гена (по данным из Gene Ontology): `r paste(genes_sig_mw$TERM[genes_sig_mw$SYMBOL == "RIC3"], collapse = "; ")`.
 
 <br>
 
@@ -525,6 +613,8 @@ df_expr_long_fin <- df_expr_long_fin %>%
   group_by(participant_id, time) %>%
   mutate(expr_rank = rank_quant(expr)) %>%
   ungroup()
+
+# rm(all_noNorm_withResponse_eset, df_expr_long, df_expr, expr_t)
 ```
 
 ### **Описание модели**
@@ -805,7 +895,7 @@ genes_sig_b2 <- genes_maxvar %>%
 
 Всего по результатам обоих подходов к спецификации экспрессии генов в линейных смешанных моделях нашлось **`r nrow(genes_sig_b2)` гена, для которых был значим основной эффект в одной из этих спецификаций и незначим эффект пересечения ни в одной из них**, а также **`r nrow(genes_sig_b3)` генов, для которых, наоборот, был значим эффект пересечения в одной из моделей, но не значим основной эффект ни в одной из них**. Можно считать, что средняя экспрессия генов первой группы значимо различалась между испытуемыми с разным уровнем ответа на вакцинацию до её проведения, но её динамика была для них схожей, а для второй группы генов, наоборот, изменение средней экспрессии после вакцинации значимо различалось в зависимости от ответа, хотя до вакцинации различий в средней экспрессии не было.
 
-С помощью базы Gene Ontology для каждого из этих наборов генов мы определили, в какие **сигнальные пути (биологические процессы)** входят их продукты, взяли по 15 путей с наибольшим числом генов, их представляющих, и на графике ниже представили результаты, дополнительно выделив те процессы, которые являются потомками процессов immune system process ([GO:0002376](https://www.ebi.ac.uk/QuickGO/term/GO:0002376)) или defense response ([GO:0006952](https://www.ebi.ac.uk/QuickGO/term/GO:0006952)) (на графике они обозначены как related to immune response).
+С помощью базы Gene Ontology для каждого из этих наборов генов мы определили, в какие **сигнальные пути (биологические процессы)** входят их продукты, взяли пути с наибольшим числом генов, их представляющих, и на графике ниже представили результаты, дополнительно выделив те процессы, которые непосредственно связаны с иммунным ответом (на графике они обозначены как related to immune response).
 
 ```{r fig5_bps_b2b3, fig.width=8, fig.height=6}
 gobp_sig_b2 <- bp_genesF(genes_sig_b2)
@@ -817,25 +907,24 @@ gobp_sig_b2b3_plot <- bind_rows(
   gobp_sig_b3 %>% 
     mutate(time = "Sig. b3 only\n(Change)")) %>%
   mutate(immresp = factor(GOBPID %in% gobp_immresp$GOBPID, labels = c("Not related to immune response", "Related to immune response"))) %>%
-  arrange(-n)
+  arrange(-n) 
 
-g1 <- gobp_sig_b2b3_plot %>% filter(time == "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
-g2 <- gobp_sig_b2b3_plot %>% filter(time != "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
+g1 <- gobp_sig_b2b3_plot %>% filter(time == "Sig. b2 only\n(Baseline)") %>% head(20) %>% pull(GOBPID)
+g2 <- gobp_sig_b2b3_plot %>% filter(time != "Sig. b2 only\n(Baseline)") %>% head(20) %>% pull(GOBPID)
 
-gobp_sig_b2b3_plot <- gobp_sig_b2b3_plot %>% 
+plt_df <- gobp_sig_b2b3_plot %>% 
   filter(GOBPID %in% c(g1,g2)) %>%
   mutate(TERM = fct_reorder(factor(TERM), n))
 
 ggplot() +
-  geom_bar(aes(y = TERM, x = n, fill = immresp), gobp_sig_b2b3_plot, 
-           stat = "identity", width = 0.6) +
+  geom_bar(aes(y = TERM, x = n, fill = immresp), plt_df, stat = "identity", width = 0.6) +
   geom_vline(xintercept = 0) +
   facet_grid(~ time, scales = "fixed") +
   scale_x_continuous(expand = c(0,0)) +
   scale_fill_manual(values = c("#76B7B2", "#F28E2B")) +
   labs(y = element_blank(), fill = element_blank(),
        x = "Number of genes with sig. coefficient",
-       title = "Figure 5. Biological processes (GO), represented by the largest number of\ngenes with significant coefficients",
+       title = "Figure 5 (1). Biological processes (GO), represented by the largest number of\ngenes with significant coefficients",
        subtitle = "Coefficients after linear mixed models") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
@@ -849,6 +938,43 @@ ggplot() +
         panel.grid.minor.y = element_blank(),
         strip.background = element_blank(),
         strip.text = element_text(size = 11, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(size = 10))
+
+g1 <- gobp_sig_b2b3_plot %>% filter(GOBPID %in% gobp_immresp$GOBPID & time == "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
+g2 <- gobp_sig_b2b3_plot %>% filter(GOBPID %in% gobp_immresp$GOBPID & time != "Sig. b2 only\n(Baseline)") %>% head(15) %>% pull(GOBPID)
+
+plt_df <- gobp_sig_b2b3_plot %>% 
+  filter(GOBPID %in% c(g1,g2)) %>%
+  mutate(TERM = fct_reorder(factor(TERM), n))
+
+ggplot() +
+  geom_bar(aes(y = TERM, x = n), plt_df, fill = "#FFBE7D", stat = "identity", width = 0.6) +
+  geom_vline(xintercept = 0) +
+  facet_grid(~ time, scales = "fixed") +
+  scale_x_continuous(expand = c(0,0)) +
+  labs(y = element_blank(), 
+       x = "Number of genes with sig. coefficient",
+       title = "Figure 5 (2). Immune-related biological processes (GO), represented by the largest number of\ngenes with significant coefficients",
+       subtitle = "Coefficients after linear mixed models") +
+  theme_classic(base_size = 12) +
+  theme(legend.justification = 1,
+        legend.key.size = unit(0.8, "lines"),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 11),
+        axis.text.y = element_text(
+          face = ifelse(levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time != "Sig. b2 only\n(Baseline)"],
+                        "plain", "bold"),
+          color = ifelse(levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time != "Sig. b2 only\n(Baseline)"],
+                         "black", "#4E79A7")),
+        panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 11, color = "black", face = "bold"),
+        panel.spacing.x = unit(0.7, "lines"),
         plot.title = element_text(size = 13, face = "bold"),
         plot.title.position = "plot",
         plot.subtitle = element_text(size = 10))
@@ -895,7 +1021,7 @@ genes_sig_ame7 <- genes_maxvar %>%
            !rank_int_ame0 & !rank_int_ame1 & !rank_int_ame3)
 ```
 
-Объедними результаты по моделям с исходными данными по экспрессии и с рангами генов по ней - получится, что для `r nrow(genes_sig_ame7)` генов ATE в 7 дней был значим в одной из этих моделей, но не значим ни в одной из них в 0-3 дня. Для `r nrow(genes_sig_ame03)` генов ATE был значим одновременно в 0-1-3 дня в любой из этих моделей и незначим в 7 дней ни в одной из них. Для каждого из этих наборов генов отберём по 15 наиболее представленных **биологических процессов**, в которых участвуют их продукты, и покажем их на графике ниже.
+Объедними результаты по моделям с исходными данными по экспрессии и с рангами генов по ней - получится, что для `r nrow(genes_sig_ame7)` генов ATE в 7 дней был значим в одной из этих моделей, но не значим ни в одной из них в 0-3 дня. Для `r nrow(genes_sig_ame03)` генов ATE был значим одновременно в 0-1-3 дня в любой из этих моделей и незначим в 7 дней ни в одной из них. Для каждого из этих наборов генов отберём наиболее представленные **биологические процессы**, в которых участвуют их продукты, и покажем их на графике ниже.
 
 ```{r fig7_bps_ame, fig.width=8, fig.height=6.5}
 gobp_sig_ame03 <- bp_genesF(genes_sig_ame03)
@@ -912,20 +1038,19 @@ gobp_sig_ame_plot <- bind_rows(
 g1 <- gobp_sig_ame_plot %>% filter(time == "Sig. at 0-3d. only") %>% head(17) %>% pull(GOBPID)
 g2 <- gobp_sig_ame_plot %>% filter(time != "Sig. at 0-3d. only") %>% head(17) %>% pull(GOBPID)
 
-gobp_sig_ame_plot <- gobp_sig_ame_plot %>% 
+plt_df <- gobp_sig_ame_plot %>% 
   filter(GOBPID %in% c(g1,g2)) %>%
   mutate(TERM = fct_reorder(factor(TERM), n))
 
 ggplot() +
-  geom_bar(aes(y = TERM, x = n, fill = immresp), gobp_sig_ame_plot, 
-           stat = "identity", width = 0.6) +
+  geom_bar(aes(y = TERM, x = n, fill = immresp), plt_df, stat = "identity", width = 0.6) +
   geom_vline(xintercept = 0) +
   facet_grid(~ time, scales = "fixed") +
   scale_x_continuous(expand = c(0,0)) +
   scale_fill_manual(values = c("#76B7B2", "#F28E2B")) +
   labs(y = element_blank(), fill = element_blank(),
        x = "Number of genes with sig. ATE",
-       title = "Figure 7. Biological processes (GO), represented by the largest number of\ngenes with significant ATEs",
+       title = "Figure 7 (1). Biological processes (GO), represented by the largest number of\ngenes with significant ATEs",
        subtitle = "ATEs after linear mixed models") +
   theme_classic(base_size = 12) +
   theme(legend.position = "bottom",
@@ -933,6 +1058,46 @@ ggplot() +
         legend.key.size = unit(0.8, "lines"),
         axis.ticks.y = element_blank(),
         axis.title.x = element_text(size = 10),
+        panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
+        panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = 11, color = "black", face = "bold"),
+        plot.title = element_text(size = 13, face = "bold"),
+        plot.title.position = "plot",
+        plot.subtitle = element_text(size = 10))
+
+g1 <- gobp_sig_ame_plot %>% filter(GOBPID %in% gobp_immresp$GOBPID & time == "Sig. at 0-3d. only") %>% head(15) %>% pull(GOBPID)
+g2 <- gobp_sig_ame_plot %>% filter(GOBPID %in% gobp_immresp$GOBPID & time != "Sig. at 0-3d. only") %>% head(15) %>% pull(GOBPID)
+
+plt_df <- gobp_sig_ame_plot %>% 
+  filter(GOBPID %in% c(g1,g2)) %>%
+  mutate(TERM = fct_reorder(factor(TERM), n))
+
+ggplot() +
+  geom_bar(aes(y = TERM, x = n), plt_df, fill = "#FFBE7D", stat = "identity", width = 0.6) +
+  geom_vline(xintercept = 0) +
+  facet_grid(~ time, scales = "fixed") +
+  scale_x_continuous(expand = c(0,0), breaks = seq(0,20,2)) +
+  labs(y = element_blank(), fill = element_blank(),
+       x = "Number of genes with sig. ATE",
+       title = "Figure 7 (2). Immune-related biological processes (GO), represented by the largest number of\ngenes with significant ATEs",
+       subtitle = "ATEs after linear mixed models") +
+  theme_classic(base_size = 12) +
+  theme(legend.justification = 1,
+        legend.key.size = unit(0.8, "lines"),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.y = element_text(
+          face = ifelse(levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time != "Sig. at 0-3d. only"] &
+                          levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time == "Sig. at 0-3d. only"],
+                        "plain", "bold"),
+          color = ifelse(levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time != "Sig. at 0-3d. only"] &
+                           levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time == "Sig. at 0-3d. only"],
+                         "black", 
+                         ifelse(levels(plt_df$TERM) %in% plt_df$TERM[plt_df$time != "Sig. at 0-3d. only"],
+                                "#E15759", "#4E79A7"))),
         panel.grid.major.x = element_line(linewidth = .2, color = '#ebebebFF'),
         panel.grid.minor.x = element_line(linewidth = .1, color = '#ebebebFF'),
         panel.grid.major.y = element_blank(),
@@ -1149,7 +1314,7 @@ ggplot() +
 
 <br>
 
-А теперь отдельно только **для процессов, являющихся потомками immune system process или defense response** (с предварительным отбором до 15 наиболее представленных процессов в каждой точке):
+А теперь отдельно только **для процессов, непосредственно связанных с иммунным ответом** (с предварительным отбором до 15 наиболее представленных процессов в каждой точке):
 
 ```{r fig11_bps_big_imm, fig.width=9, fig.height=10}
 gobp_imm_time_plot <- gobp_time %>%
@@ -1504,16 +1669,16 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
 
 <br>
 
-Выше мы уже использовали базу Gene Ontology (GO) для определения аннотаций биологических процессов, в которых участвуют белковые продукты генов, дифференциально экспрессированных у испытуемых с разным уровнем ответа на вакцинацию. Однако поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **[singular enrichment анализа (SEA)](https://humgenomics.biomedcentral.com/articles/10.1186/1479-7364-4-3-202)**, позволяют определить, какие именно биологические процессы "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа (в нашем случае 5 тыс.). 
+Выше мы уже использовали базу Gene Ontology (GO) для определения аннотаций биологических процессов, в которых участвуют белковые продукты генов, дифференциально экспрессированных у испытуемых с разным уровнем ответа на вакцинацию. Однако поскольку генов-находок может быть много, искать подобные аннотации по каждому из них не только не слишком удобно, но не совсем правильно, поскольку продукты разных генов могут участвовать в одних и тех же процессах, как и продукты одного и того же гена могут участвовать в разных. Методы, используемые в рамках **singular enrichment анализа (SEA)** [@tipney_introduction_2010], позволяют определить, какие именно биологические процессы "перепредставлены" (overrepresented) в найденном наборе из $n$ генов по сравнению с полным набором $N$ генов, отобранных нами для анализа (в нашем случае 5 тыс.). 
 
-В своём исследовании мы будем выявлять такие процессы, основываясь на оценке **p-values гипергеометрического распределения**, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по [формуле](https://academic.oup.com/bioinformatics/article/20/18/3710/202612): $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
+В своём исследовании мы будем выявлять такие процессы, основываясь на оценке **p-values гипергеометрического распределения**, т.е. вероятностей получить в выборке из $n$ генов такую же или бОльшую представленность данного процесса, как в полном наборе из $N$ генов. Рассчитать p-value можно по формуле [@boyle_gotermfinder_open_2004]: $$P=1-\sum_{i=0}^{k-1}\frac{C_M^i C_{N-M}^{n-i}}{C_N^i}$$
 где $C_M^i$ - число сочетаний из $M$ по $i$, $N$ - общее количество генов, отобранных нами для анализа (5 тыс.), $M$ - кол-во генов из числа $N$ с определённым биологическим процессом в аннотации, $n$ - кол-во "значимых" генов, обнаруженных на этапе оценки дифференциальной экспрессии, $k$ - кол-во генов из числа $n$ с определённым биологическим процессом в аннотации. 
 
 В R для этого будем использовать функцию `hyperGtest` из пакета `Category` с опцией `conditional = TRUE` (эта опция означает, что при тестировании родительских "узлов" биологических процессов будут исключаться те "потомки", для которых p-value уже оказался ниже порогового уровня значимости; в качестве такого порога будем использовать значение 0.05). Данная функция - это аналог такой же функции из пакета `GOstats`, позволяющий дополнительно вводить ограничения на минимальный и максимальный размеры наборов генов, участвующих в оценке условного гипергеометрического теста (возьмём 10 и 500, соответственно). 
 
 После оценки гипергеометрического теста исключим выявленные в нём биологические процессы, в которых вошло менее 5 генов из числа значимых - далее будем работать с p-values по оставшимся процессам.
 
-Для **контроля FDR** мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку [q-values](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC170937/).
+Для **контроля FDR** мы попробуем использовать два подхода: коррекцию p-values, полученных по всем выявленным биологическим процессам, с помощью метода Бенджамина-Хохберга и оценку q-values [@storey_statistical_2003].
 
 SEA будем проводить отдельно для каждого набора значимых генов, выявленных нами по результатам оценки различных линейных смешанных моделей и логистических регрессий.
 
@@ -1534,7 +1699,8 @@ genes_universe <- genes_maxvar %>%
 # https://biocorecrg.github.io/PHINDaccess_RNAseq_2020/functional_analysis.html
 
 hg_res <- map(
-  genes_universe %>% select(dplyr::starts_with("init"), dplyr::starts_with("rank"), dplyr::starts_with("log")),
+  genes_universe %>% dplyr::select(dplyr::starts_with("init"), dplyr::starts_with("rank"), 
+                                   dplyr::starts_with("log"), -contains("b2b3")),
   function(x) {
     hg_params <- new(getClassDef("GOHyperGParams", package = "Category"),
                      geneIds = genes_universe$ENTREZID[x],
@@ -1670,7 +1836,7 @@ imap_dfr(
 
 Видим, что, в основном, перепредставленные процессы обнаруживаются до вакцинации или в 1 день после неё.
 
-В таблице ниже перечислим все **процессы с q-value < 0.05**, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели. Среди них нет ни одного, который бы являлся потомков процессов immune system process или defense response.
+В таблице ниже перечислим все **процессы с q-value < 0.05**, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели. Среди них нет ни одного, который бы относился к процессам, обозначенным нами как непосредственно связанные с иммунным ответом.
 
 ```{r tab6_hypergres}
 gobp_overrep <- imap_dfr(
@@ -1697,3 +1863,18 @@ gobp_overrep %>%
 ```
 
 <br>
+
+## **Список литературы**
+
+<br>
+
+```{r further, echo=FALSE, eval=FALSE}
+https://www.bioconductor.org/packages/devel/bioc/vignettes/CEMiTool/inst/doc/CEMiTool.html
+https://academic.oup.com/bioinformatics/article/37/16/2382/6149124?login=false
+https://github.com/Drinchai/BloodGen3Module/
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8388021/
+https://www.nature.com/articles/ni.2789?report=reader#Sec24 #with downloadable table with BTM annotations and Python script
+https://www.nature.com/articles/s41590-022-01328-6
+https://www.nature.com/articles/s41590-022-01361-5
+https://www.nature.com/articles/ni.2789
+```
