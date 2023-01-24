@@ -1,5 +1,7 @@
-# **Identification of genes associated with immune response using open database ImmuneSpace**'
-### **Study SDY984 (immune response after varicella zoster vaccine)**'
+# **Identification of genes associated with immune response using open database ImmuneSpace**
+### **Study SDY984 (immune response after varicella zoster vaccine)**
+
+Author: Olga Mironenko
 
 <br>
 
