@@ -272,7 +272,7 @@ knitr::include_graphics(file.path("..", "OlgaMironenko", "images", "ImmResp_Vacc
 
 Вакцина может содержать молекулярные паттерны, ассоциированные с патогеном (PAMPs), или спровоцировать локальную реакцию в виде высвобождения молекулярных паттернов, ассоциированных с повреждением (DAMPs). Эти паттерны распознаются рецепторами распознавания образов (PRRs), экспрессируемых клетками, являющимися частью системы **врождённого иммунитета**: макрофагами, тучными клетками, нейтрофилами, дендритными клетками (DCs). Эти клетки призваны не определить, с чем именно - с какой именно инфекцией или иным патогеном - столкнулся организм, а, в зависимости от того, о каких клетках идёт речь, уничтожить или поглотить патоген, расщепить его на фрагменты и/ или просигнализировать клеткам адаптивного иммунитета о том, что организм с ним столкнулся. Система **адаптивного иммунитета** уже будет работать на то, чтобы сформировать/ задействовать специфичный, прицельный иммунный ответ именно на данный патоген, в частности, в виде выработки специфических антител к нему. 
 
-Также в рамках врождённого иммунитета PAMPs и DAMPs могут распознаваться и лимфоидными клетками (например, NK-клетками), которые в ответ на это продуцируют цитокины, участвующие, в том числе, в активации и ориентации дендритных клеток, играющих основную роль в передаче сигнала от системы врождённого к системе адаптивного иммунного ответа. После активации дендритные клетки мигрируют в лимфатические узлы, где презентируют фрагменты поглощенного антигена T-клеткам через специальный механизм костимуляции рецепторов T-клеток (TCR), в процессе которой одни T-клетки (T-киллеры, или CD8+ лимфоциты) взаимодействуют с молекулами главного комплекса гистосовместимости первого типа (MCH-I) и при обнаружении чужеродных MHC-I выделяют белки, растворяющие патоген, а другие (T-хелперы, или CD4+ лимфоциты) взаимодействуют с молекулами второго типа (MHC-II) и при обранужении чужеродных MCH-II продуцируют хемокины и цитокины. В зависимости от цитокиновой среды CD4+ лимфоциты могут дифференцироваться в различные подтипы T-хелперов (Th), а также T-фолликулярные хелперы (Tfh) - последние активируют B-клетки, в процессе дифференцировки которых образуются плазматические клетки, вырабатывающие антиген-специфические антитела. В процессе дифференцировки B-клеток и CD8+ лимфоцитов также будут образовываться клетки памяти, что позволит иммунной системе в дальнейшем быстрее распознавать и реагировать на контакт с уже знакомым патогеном.
+Также в рамках врождённого иммунитета PAMPs и DAMPs могут распознаваться и лимфоидными клетками (например, NK-клетками), которые в ответ на это продуцируют цитокины, участвующие, в том числе, в активации и ориентации дендритных клеток, играющих основную роль в передаче сигнала от системы врождённого к системе адаптивного иммунного ответа. После активации дендритные клетки мигрируют в лимфатические узлы, где презентируют фрагменты поглощенного антигена T-клеткам через специальный механизм костимуляции рецепторов T-клеток (TCR), в процессе которой одни T-клетки (T-киллеры, или CD8+ лимфоциты) взаимодействуют с молекулами главного комплекса гистосовместимости первого типа (MHC-I) и при обнаружении чужеродных MHC-I выделяют белки, растворяющие патоген, а другие (T-хелперы, или CD4+ лимфоциты) взаимодействуют с молекулами второго типа (MHC-II) и при обранужении чужеродных MHC-II продуцируют хемокины и цитокины. В зависимости от цитокиновой среды CD4+ лимфоциты могут дифференцироваться в различные подтипы T-хелперов (Th), а также T-фолликулярные хелперы (Tfh) - последние активируют B-клетки, в процессе дифференцировки которых образуются плазматические клетки, вырабатывающие антиген-специфические антитела. В процессе дифференцировки B-клеток и CD8+ лимфоцитов также будут образовываться клетки памяти, что позволит иммунной системе в дальнейшем быстрее распознавать и реагировать на контакт с уже знакомым патогеном.
 
 Описанная схема формирования иммунного ответа даёт примерное представление о том, какие биологические процессы она задействует. 
 
@@ -1383,13 +1383,13 @@ df_expr_wide_fin <- df_expr_long_fin %>%
 
 <br>
 
-Для каждого гена из ранее отобранных 5 тыс. оценим **логистическую регрессию вида**:
+Для каждого гена из ранее отобранных 5 тыс. и каждой точки исследования оценим **логистическую регрессию вида**:
 
-$log(odds(response_{i})) = \gamma_0 + \gamma_1*expr_{0i} + \gamma_2*expr_{1i} + \gamma_3*expr_{3i} + \gamma_4*expr_{7i}$, где:
+$log(odds(response_{i})) = \gamma_0 + \gamma_1*expr_{ij}$, где:
 
 - $response_i$ - ответ на вакцинацию _i_-го испытумого (1 - high responder, 0 - low responder), 
 
-- $expr_{ji}$ - экспрессия гена для _i_-го испытуемого в точке исследования _j_, $j=0,1,3,7$. Как и при оценке дифференциальной экспрессии, отдельно оценим спецификации с:
+- $expr_{ij}$ - экспрессия гена для _i_-го испытуемого в точке исследования _j_, $j=0,1,3,7$. Как и при оценке дифференциальной экспрессии, отдельно оценим спецификации с:
 
   - исходными данными по экспрессии, 
 
@@ -1397,9 +1397,9 @@ $log(odds(response_{i})) = \gamma_0 + \gamma_1*expr_{0i} + \gamma_2*expr_{1i} + 
 
 - $\gamma_0$ - константа регрессионного уравнения,
 
-- $\gamma_1,\gamma_2,\gamma_3,\gamma_4$ - коэффициенты регрессионного уравнения.
+- $\gamma_1$ - коэффициент регрессионного уравнения.
 
-Результаты оценки логистических регрессий будем представлять в виде экспонированных значений коэффициентов, которые можно будет интерпретировать как количество раз, в которое изменится шанс сильного ответа на вакцинацию в случае увеличения экспрессии в соответствующей точке на 1, при прочих равных условиях. 
+Результаты оценки логистических регрессий будем представлять в виде экспонированного значения коэффициента, которое можно будет интерпретировать как количество раз, в которое изменится шанс сильного ответа на вакцинацию в случае увеличения экспрессии в соответствующей точке на 1. 
 
 ```{r logreg_est, eval=FALSE}
 # Оценка логистических регрессий
@@ -1408,16 +1408,25 @@ glm_q <- purrr::quietly(.f = glm)
 
 logreg_fits <- df_expr_wide_fin %>%
   nest(-gene) %>%
-  mutate(fit_init = map(data, ~ glm_q(response ~ expr_0 + expr_1 + expr_3 + expr_7, .x, family = "binomial")),
-         fit_rank = map(data, ~ glm_q(response ~ expr_0 + expr_1 + expr_3 + expr_7, 
-                                      .x %>% select(-matches("expr_\\d")) %>%
-                                        rename_with(gsub, matches("expr_rank_\\d"), pattern = "_rank", replacement = ""), 
-                                      family = "binomial")))
+  mutate(fit_init0 = map(data, ~ glm_q(response ~ expr_0, .x, family = "binomial")),
+         fit_init1 = map(data, ~ glm_q(response ~ expr_1, .x, family = "binomial")),
+         fit_init3 = map(data, ~ glm_q(response ~ expr_3, .x, family = "binomial")),
+         fit_init7 = map(data, ~ glm_q(response ~ expr_7, .x, family = "binomial")),
+         fit_rank0 = map(data, ~ glm_q(response ~ expr_rank_0, .x, family = "binomial")),
+         fit_rank1 = map(data, ~ glm_q(response ~ expr_rank_1, .x, family = "binomial")),
+         fit_rank3 = map(data, ~ glm_q(response ~ expr_rank_3, .x, family = "binomial")),
+         fit_rank7 = map(data, ~ glm_q(response ~ expr_rank_7, .x, family = "binomial")))
 
 logreg_res <- logreg_fits %>%
   mutate(
-    gamma_p_init = map(fit_init, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
-    gamma_p_rank = map(fit_rank, ~ .x$result %>% broom.mixed::tidy(exp = TRUE))) %>%
+    gamma_p_init0 = map(fit_init0, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_init1 = map(fit_init1, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_init3 = map(fit_init3, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_init7 = map(fit_init7, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_rank0 = map(fit_rank0, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_rank1 = map(fit_rank1, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_rank3 = map(fit_rank3, ~ .x$result %>% broom.mixed::tidy(exp = TRUE)),
+    gamma_p_rank7 = map(fit_rank7, ~ .x$result %>% broom.mixed::tidy(exp = TRUE))) %>%
   select(-data, -contains("fit"))
 
 # # Сохраним результаты в rds
@@ -1427,17 +1436,10 @@ logreg_res <- logreg_fits %>%
 
 # Exp.gammas and p-values
 
-logreg_gammas <- full_join(
-  logreg_res %>%
-    select(gene, gamma_p_init) %>%
-    unnest(gamma_p_init) %>%
-    select(gene, term, estimate, p.value),
-  logreg_res %>%
-    select(gene, gamma_p_rank) %>%
-    unnest(gamma_p_rank) %>%
-    select(gene, term, estimate, p.value),
-  by = c("gene", "term"), suffix = c("_init", "_rank"))
-
+logreg_gammas <- logreg_res %>%
+  unnest(-gene, names_sep = "_") %>% 
+  rename_with(function(x) gsub("gamma_p_", "", x), -gene)
+  
 # Сохраним результаты в rds, чтобы при формировании отчёта не ждать оценки регрессий
 saveRDS(logreg_gammas, "OlgaMironenko/res/logreg_gammas.rds")
 ```
@@ -1451,17 +1453,15 @@ critv <- -log10(0.05)
 # Data frame for all exp.gammas and p-values for all LMMs
 
 logreg_res_long <- logreg_gammas %>%
-    filter(grepl("expr", term)) %>%
-    transmute(gene, time = as.numeric(str_extract(term, "\\d")),
-              estimate_init, estimate_rank, p.value_init, p.value_rank) %>%
-    pivot_longer(cols = -c(gene, time), 
-                 names_pattern = "(estimate|p.value)_(.+)$",
-                 names_to = c(".value", "expr")) %>%
+  filter(grepl("expr", init0_term)) %>%
+  select(gene, contains("estimate"), contains("p.value")) %>%
+  pivot_longer(cols = -gene, names_pattern = "(init|rank)(\\d)_(estimate|p.value)",
+               names_to = c("expr", "time", ".value")) %>%
   mutate(logp = -log10(p.value),
          sig = logp > critv,
          model_var = sprintf("log_%s_%s", expr, time),
-         expr = factor(expr, c("init", "rank"), c("Expression as is", "Rank by expression")),
-         time = factor(time, timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
+         expr = factor(expr, c("init", "rank"), c("Expression as is", "Ranks by expression")),
+         time = factor(as.numeric(time), timepoints, labels = ifelse(timepoints == 0, "Baseline", paste(timepoints, "d."))))
 
 # Significant genes
 
@@ -1809,7 +1809,7 @@ ft_res_n <- imap_dfr(
 
 Ниже для каждого набора значимых генов, выявленного нами по результатам оценки линейных смешанных моделей и логистических регрессий, покажем **количество "перепредставленных" этим набором биологических процессов при разных пороговых значениях для скорректированных p-values и для q-values** (пустая ячейка означает отсутствие процессов, удовлетворяющих соответствующему критерию).
 
-```{r tab5_hypergres}
+```{r tab4_hypergres}
 # hg_res_pq <- readRDS("OlgaMironenko/res/hg_res_pq.rds")
 hg_res_pq <- readRDS(file.path("..", "OlgaMironenko", "res", "hg_res_pq.rds"))
 
@@ -1827,7 +1827,7 @@ imap_dfr(
   mutate_if(is.numeric, ~ ifelse(. == 0, NA, .)) %>%
   kable(align = "lcccccccc",
         col.names = c("Gene set source", rep(paste("< ", c(0.1,0.05,0.01,0.001)), 2)),
-        caption = "<b>Table 5. Number of significant biological processes (GO) found in hypergeometric tests</b>") %>%
+        caption = "<b>Table 4. Number of significant biological processes (GO) found in hypergeometric tests</b>") %>%
   kableExtra::add_header_above(c(" " = 1, "Adjusted p-value" = 4, "q-value" = 4)) %>% 
   kableExtra::row_spec(0, bold = TRUE) %>%
   kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
@@ -1838,7 +1838,7 @@ imap_dfr(
 
 В таблице ниже перечислим все **процессы с q-value < 0.05**, сгруппировав их по точкам, в которых они были перепредставлены по результатам хотя бы одной модели. Среди них нет ни одного, который бы относился к процессам, обозначенным нами как непосредственно связанные с иммунным ответом.
 
-```{r tab6_hypergres}
+```{r tab5_hypergres}
 gobp_overrep <- imap_dfr(
   hg_res_pq,
   ~ .x %>% filter(qvalue < 0.05) %>% 
@@ -1854,7 +1854,7 @@ g1 <- which(gobp_overrep$GOID %in% gobp_immresp$GOBPID)
 gobp_overrep %>%
   kable(align = "lcll",
         col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
-        caption = "<b>Table 6. Overrepresented BPs, by time</b>") %>%
+        caption = "<b>Table 5. Overrepresented BPs, by time</b>") %>%
   kableExtra::row_spec(c(0, g1), bold = TRUE) %>%
   kableExtra::column_spec(1:4, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
@@ -1869,6 +1869,7 @@ gobp_overrep %>%
 <br>
 
 ```{r further, echo=FALSE, eval=FALSE}
+# Ссылки для даотнешего анализа/ изучения
 https://www.bioconductor.org/packages/devel/bioc/vignettes/CEMiTool/inst/doc/CEMiTool.html
 https://academic.oup.com/bioinformatics/article/37/16/2382/6149124?login=false
 https://github.com/Drinchai/BloodGen3Module/
