@@ -75,13 +75,7 @@ Vaccine contains patogene-associated molecular patterns (PAMPs) or can induce lo
 
 In addition, PAMPs and DAMPs can be detected by lymphoid cells of the innate immunity (e.g., NK cells), which induce the release of cytokines, that may cooperate in the activation and orientation of the dendritic cells (DCs). DCs plays the crucial role in transferring the signal from the innate to the adaptive immune system. Activated DCs migrate to lymphoid nodes where they represent fragments of the absorbed antigen to T-cells through special mechanism of co-stimulation of the T-cells receptors (TCR). At this stage one type of T-cells (T-killers, or CD8+ lymphocytes) interact with the type I molecules of the major histocompatibility complex (MHC-I) and, upon recognition of the alien MHC-I, release proteins that dissolve the pathogen, while another type of T-cells (T-helpers, or CD4+ lymphocytes) interact with the type II molecules of the MHC (MHC-II) and, upon recognition of the alien MHC-II, produce cytokines and chemokines. Depending on the cytokines mileau, CD4+ lymphocites can differentiate into different subtypes of T-helpers (Th) and T-follicular helpers (Tfh) - the latter activates B-cells which differentiate into plasma cells that produce antigen-specific antibodies. B-cells and CD8+ lymphocytes can differentiate into memory cells, which allow immune system more quickly recognize and response to familiar pathogen.
 
-The given algorithm of the immune response to vaccination gives a rough notion about those biological processes which can be activated after vaccination. 
-
-<br>
-
-As far as participation of the particular genes' products in these processes, one can obtain information about it from the **[Gene Ontology (GO)](http://geneontology.org/)** - a special knowledge database containing the most up-to-date information concerning annotations on genes, gene products' molecular functions, biological processes accomplished by these products and cellular components inside which these functions are performed. In our research we will be mainly interested in biological processes represented by genes with differential expression.
-
-In addition, we will emphasize those **paths which are directly related to the immune response**, namely the offsprings of the following bioilgical processes (on the pictures below only their childrens are shown):
+The given algorithm of the immune response to vaccination gives a rough notion about those biological processes which can be activated after vaccination. Based on that, in our analysis we will pay special attention to those **paths which are directly related to the immune response**, namely the offsprings of the following bioilgical processes from Gene Ontology (on the pictures below only their childrens are shown):
 
 - immune system process ([GO:0002376](https://www.ebi.ac.uk/QuickGO/term/GO:0002376)) - any process involved in the development or functioning of the immune system, an organismal system for calibrated responses to potential internal or invasive threats.
 
@@ -272,11 +266,11 @@ Below histograms for expression are given for 10 randomly selected genes.
 
 We will use several althernative **approaches for identifying genes related to immune response**:
 
-1. Compare gene expressions between low and high responders using the Mann-Whitney test at every time point (0, 1, 3 and 7 days) with FDR-adjusted p-values (Benjamini & Hochberg adjustment), and mark those with adjusted p-value < 0.05 as differentially expressed (DEGs).
+1. Compare gene expressions between low and high responders using the **Mann-Whitney test** at every time point (0, 1, 3 and 7 days) with FDR-adjusted p-values (Benjamini & Hochberg adjustment), and mark those with adjusted p-value < 0.05 as differentially expressed (DEGs).
 
 2. For every gene out of 5 thousand genes with the largest MAD we will estimate **linear mixed effects model** of the following kind:
 
-_expr<sub>it</sub> = &beta;<sub>0</sub> + &beta;<sub>0i</sub> + &beta;<sub>1</sub>*time<sub>j</sub> + &beta;<sub>2</sub>*response<sub>i</sub> + &beta;<sub>3</sub>*time<sub>j</sub>*response<sub>i</sub> + &epsilon;<sub>ij</sub>_, where
+  _expr<sub>it</sub> = &beta;<sub>0</sub> + &beta;<sub>0i</sub> + &beta;<sub>1</sub>*time<sub>j</sub> + &beta;<sub>2</sub>*response<sub>i</sub> + &beta;<sub>3</sub>*time<sub>j</sub>*response<sub>i</sub> + &epsilon;<sub>ij</sub>_, where
 
 - _expr<sub>it</sub>_ - _i_-th individual's gene expression at the _j_-th time point; we will estimate separate specifications for expression measured as:
 
@@ -296,13 +290,13 @@ _expr<sub>it</sub> = &beta;<sub>0</sub> + &beta;<sub>0i</sub> + &beta;<sub>1</su
 
 - _&epsilon;<sub>ij</sub>_ - residuals (it is assumed that they are normally distributed with zero mean and variance which characterize the within-subject variation of the gene expression (in time)).
 
-This model allows to estimate whether the response effect changes significantly over time (or, equivalently, whether the change in expression differs significantly depending on the response to vaccination). _&beta;<sub>2</sub>_ estimate in this model can be interpreted as the average treatment effect (ATE) of the high response at the Baseline (_time=0_), i.e. the baseline difference in the average gene expression between high and low responders. For other time points the ATE can be calculated as _&beta;<sub>2</sub> + &beta;<sub>3</sub>*time_. Therefore, _&beta;<sub>3</sub>_ estimate can be interpreted as the average change in the ATE of the high response with every additional day after vaccination.
+  This model allows to estimate whether the response effect changes significantly over time (or, equivalently, whether the change in expression differs significantly depending on the response to vaccination). _&beta;<sub>2</sub>_ estimate in this model can be interpreted as the average treatment effect (ATE) of the high response at the Baseline (_time=0_), i.e. the baseline difference in the average gene expression between high and low responders. For other time points the ATE can be calculated as _&beta;<sub>2</sub> + &beta;<sub>3</sub>*time_. Therefore, _&beta;<sub>3</sub>_ estimate can be interpreted as the average change in the ATE of the high response with every additional day after vaccination.
 
-Linear mixed models will be estimated with the `lmer` function out of the `lme4` package (Bates et al. 2015) for R (version 4.1.1), average treatment effects will be estimated with the means of the `marginaleffects` function out of the package with the same name (Arel-Bundock 2023). It can be noted that if we give particular time points to the latter function after the mixed model with the interaction term (e.g., _time=0,1,3,7_), then near the _response_ variable we will get the desired values for the ATE of the high response at these points (_&beta;<sub>2</sub> + &beta;<sub>3</sub>*time_) with the corresponding p-values. If to not pass the time points into this function, near the _response_ variable we will get the estimate for the ATE of the high response from the model without the interaction term.
+  Linear mixed models will be estimated with the `lmer` function out of the `lme4` package (Bates et al. 2015) for R (version 4.1.1), average treatment effects will be estimated with the means of the `marginaleffects` function out of the package with the same name (Arel-Bundock 2023). It can be noted that if we give particular time points to the latter function after the mixed model with the interaction term (e.g., _time=0,1,3,7_), then near the _response_ variable we will get the desired values for the ATE of the high response at these points (_&beta;<sub>2</sub> + &beta;<sub>3</sub>*time_) with the corresponding p-values. If to not pass the time points into this function, near the _response_ variable we will get the estimate for the ATE of the high response from the model without the interaction term.
 
 3. For every gene out of 5 thousand genes with the largest MAD we will estimate **logistic regression** of the following kind:
 
-_log(odds(response<sub>i</sub>)) = $gamma;<sub>0</sub> + $gamma;<sub>1</sub>*expr<sub>ij</sub>_, where:
+  _log(odds(response<sub>i</sub>)) = γ<sub>0</sub> + γ<sub>1</sub>*expr<sub>ij</sub>_, where:
 
 - _response<sub>i</sub>_ - response to vaccination for the _i_-th participant (1 - high responder, 0 - low responder), 
 
@@ -312,11 +306,11 @@ _log(odds(response<sub>i</sub>)) = $gamma;<sub>0</sub> + $gamma;<sub>1</sub>*exp
 
   - ranks of genes by expression, calculated for each participant at each time point as the quantile of the empirical distribution function for all genes' expression for this participant at this time point (for interpretability of results in logistic regressions we transformed ranks into the scale from 0 to 100), 
 
-- _$gamma;<sub>0</sub>_ - regression intercept,
+- _γ<sub>0</sub>_ - regression intercept,
 
-- _$gamma;<sub>1</sub>_ - regression coefficient.
+- _γ<sub>1</sub>_ - regression coefficient.
 
-Estimates of the regression coefficient for each gene and time point will be exponentiated, and after that we will be able to interpret them as the odds ratios (ORs) of response in respect to the increase in the gene expression by 1 at the corresponding time point. 
+  Estimates of the regression coefficient for each gene and time point will be exponentiated, and after that we will be able to interpret them as the odds ratios (ORs) of response in respect to the increase in the gene expression by 1 at the corresponding time point. 
 
 <br>
 
