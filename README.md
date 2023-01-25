@@ -13,7 +13,11 @@ Fall 2022
 
 <br>
 
-This study project deals with the data on the gene expression among volunteers before and after vaccination with the **live attenuated shingles vaccine Zostavax**, obtained from the open database [ImmuneSpace](https://www.immunespace.org/). We were interested in identifying genes with expression associated with the immune response, as well as in revealing signalling paths represented by these genes.
+Vaccination leads to the development of the immunity against specific pathogen. This process is associated with the activation of various genes expression and molecular pathways. The quality of vaccination might be assessed by measuring the titer of specific antibodies. However, in some cases, the antibody titer does not increase after vaccination, which may indicate a lack of immunity against the pathogen. Recent advances in transcriptomics technologies allowed scientists and clinicians to collect high-throughput immunological data, for example, in order to conduct controlled vaccinational studies. These methods will help to study the molecular mechanisms of the vaccine-induced immunity, as well as to search for molecular signatures to predict the quality of immunity against particular pathogens.
+
+Varicella zoster is a commonly known virus from the Herpesviridae family, which is capable to cause such diseases as shingles and postherpetic neuralgia. Risk of these diseases increases with the age, so vaccination is highly recommended for people who is older than 60 years. Zostavax is a live attenuated vaccine which is used to treat a latent virus that has remained dormant in cells since chicken pox infection. 
+
+In this study we analysed transcriptomics data revealed as part of the research conducted by the Human Immunology Project Consortium from patients after vaccination with Zostavax using ImmuneSpace database. The aim of the study was to compare the gene expression profiles of patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
 
 <br>
 
