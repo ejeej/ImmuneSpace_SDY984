@@ -300,7 +300,7 @@ We will use several althernative **approaches for identifying genes related to i
 
 - _response<sub>i</sub>_ - response to vaccination for the _i_-th participant (1 - high responder, 0 - low responder), 
 
-- _expr<sub>ij</sub>_ - gene expression for the _i_-th participant at the _j_-th time point, $j=0,1,3,7$. As for linear mixed models we will estimate separate specifications for:
+- _expr<sub>ij</sub>_ - gene expression for the _i_-th participant at the _j_-th time point, _j=0,1,3,7_. As for linear mixed models we will estimate separate specifications for:
 
   - the initially given data, 
 
