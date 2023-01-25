@@ -982,6 +982,18 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that modulates the frequency, rate, or extent of natural killer cell mediated immunity.</b> </td>
   </tr>
   <tr>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089</b> </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of innate immune response</b> </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection.</b> </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045954</b> </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of natural killer cell mediated cytotoxicity</b> </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of natural killer cell mediated cytotoxicity.</b> </td>
+  </tr>
+  <tr>
    <td style="text-align:left;vertical-align:top;"> 1 d. </td>
    <td style="text-align:center;vertical-align:top;"> GO:0010562 </td>
    <td style="text-align:left;vertical-align:top;"> positive regulation of phosphorus metabolic process </td>
@@ -1034,18 +1046,6 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
    <td style="text-align:center;vertical-align:top;"> GO:0043393 </td>
    <td style="text-align:left;vertical-align:top;"> regulation of protein binding </td>
    <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of protein binding. </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089</b> </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of innate immune response</b> </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection.</b> </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045954</b> </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of natural killer cell mediated cytotoxicity</b> </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of natural killer cell mediated cytotoxicity.</b> </td>
   </tr>
   <tr>
    <td style="text-align:left;vertical-align:top;"> 1 d. </td>
@@ -1199,6 +1199,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
   </tr>
 </tbody>
 </table>
+<br>
 
 <br>
 
