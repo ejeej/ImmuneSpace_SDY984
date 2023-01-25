@@ -25,7 +25,7 @@ This study project deals with the data on the gene expression among volunteers b
 
 This aim can be achieved bt solving the following **tasks**: 
 
-- Literature review on the basics of RNA transcription and the process of immune response to vaccination.
+- Literature review on the basics of RNA transcription, process of immune response to vaccination and results of other studies realized on the same dataset.
 
 - Descriptive statistics for the baseline characteristics of the study participants.
 
