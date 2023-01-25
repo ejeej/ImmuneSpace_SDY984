@@ -37,7 +37,7 @@ This aim can be achieved bt solving the following **tasks**:
 
 <br>
 
-Dataset for the project was obtained within the **study [SDY984]**(https://www.immport.org/shared/study/SDY984) realized under the program of the [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) and is available at [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (can be downloaded after registration). Results of the original study made on the full data set were published in (Li et al. 2017).
+Dataset for the project was obtained within the **study [SDY984](https://www.immport.org/shared/study/SDY984)** realized under the program of the [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) and is available at [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (can be downloaded after registration). Results of the original study made on the full data set were published in (Li et al. 2017).
 
 Gene annotations will be obtained from the **[Gene Ontology (GO)](http://geneontology.org/)** - a special knowledge database containing the most up-to-date information concerning annotations on genes, gene products' molecular functions, biological processes accomplished by these products and cellular components inside which these functions are performed. In our research we will be mainly interested in biological processes represented by genes with differential expression.
 
