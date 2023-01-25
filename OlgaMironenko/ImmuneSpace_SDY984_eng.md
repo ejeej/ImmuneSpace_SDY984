@@ -2,7 +2,7 @@
 title: '**Identification of genes associated with immune response using open database ImmuneSpace**'
 subtitle: '**Study SDY984 (immune response after varicella zoster vaccine)**'
 author: "Olga Mironenko"
-date: "2023-01-24"
+date: "2023-01-25"
 output:
   html_document:
     code_folding: hide
@@ -1934,9 +1934,9 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
 
 We have already used Gene Ontology (GO) to obtain annotations for biological processes (BPs) into which products of the differentially expressed genes are involved. However, there can be many findings (i.e.many DEGs), and it is both inconvenient and incorrect to look for annotations for each of them, because products of the same gene can participate in different paths, as well as products from different genes can be involved into the same process. Approaches from the **singular enrichment analysis (SEA)** [@tipney_introduction_2010] allows to determine which particular processes are overrepresented by the genes in some set in comparison with the full gene set (the latter comrises 5 thousand genes in our case). 
 
-In our research we will try to reveal such overrepresented BPs using **p-values from the hypergeometric distribution**, i.e. probabilities of getting the same or even more representation of the given BP in the set of $n$ genes in comparison with the full set of $N$ genes [@boyle_gotermfinder_open_2004]. These p-values can be calculated with the `hyperGtest` function from the `Category` package in R [@gentleman_r_category_2022]. We will set the option `conditional` to TRUE in it. According to the package vignette, in this case "`hyperGTest` function uses the structure of the GO graph to estimate for each term whether or not there is evidence beyond that which is provided by the term's children to call the term in question statistically overrepresented. The algorithm conditions on all child terms that are themselves significant at the specified p-value, odds ratio, minimum or maximum gene set size cutoff. Given a subgraph of the GO ontology, the terms with no child categories are tested first. Next the nodes whose children have already been tested are tested. If any of a given node's children tested significant, the appropriate conditioning is performed)" [@@falcon_using_2007]. 
+In our research we will try to reveal such overrepresented BPs using **p-values from the hypergeometric distribution**, i.e. probabilities of getting the same or even more representation of the given BP in the set of $n$ genes in comparison with the full set of $N$ genes [@boyle_gotermfinder_open_2004]. These p-values can be calculated with the `hyperGtest` function from the `Category` package in R [@gentleman_r_category_2022]. We will set the option `conditional` to TRUE in it. According to the package vignette, in this case "`hyperGTest` function uses the structure of the GO graph to estimate for each term whether or not there is evidence beyond that which is provided by the term's children to call the term in question statistically overrepresented. The algorithm conditions on all child terms that are themselves significant at the specified p-value, odds ratio, minimum or maximum gene set size cutoff. Given a subgraph of the GO ontology, the terms with no child categories are tested first. Next the nodes whose children have already been tested are tested. If any of a given node's children tested significant, the appropriate conditioning is performed)" [@falcon_using_2007]. 
 
-We use 0.05 as a p-value cut-off and set minimum and maximum number of genes in BPs in the gene universe to 10 and 500, correspondingly. After estimating the hypergepmetric test we will exclude BPs with less than 5 genes from the chosen gene set.
+We use 0.05 as a p-value cut-off and set minimum and maximum number of genes in BPs in the gene universe to 10 and 500, correspondingly. After estimating the hypergeometric test we will exclude BPs with less than 5 genes from the chosen gene set.
 
 We will use two approaches to **control FDR** here: p-value adjustment under Benjamini & Hochberg method and q-values estimations [@storey_statistical_2003].
 
@@ -2043,7 +2043,7 @@ imap_dfr(
   mutate_if(is.numeric, ~ ifelse(. == 0, NA, .)) %>%
   kable(align = "lcccccccc",
         col.names = c("Gene set source", rep(paste("< ", c(0.1,0.05,0.01,0.001)), 2)),
-        caption = "<b>Table 5. Number of significant biological processes (GO) found in hypergeometric tests</b>") %>%
+        caption = "<b>Table 4. Number of significant biological processes (GO) found in hypergeometric tests</b>") %>%
   kableExtra::add_header_above(c(" " = 1, "Adjusted p-value" = 4, "q-value" = 4)) %>% 
   kableExtra::row_spec(0, bold = TRUE) %>%
   kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
@@ -2051,7 +2051,7 @@ imap_dfr(
 ```
 
 <table class=" lightable-classic" style='font-size: 14px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 5. Number of significant biological processes (GO) found in hypergeometric tests</b></caption>
+<caption style="font-size: initial !important;"><b>Table 4. Number of significant biological processes (GO) found in hypergeometric tests</b></caption>
  <thead>
 <tr>
 <th style="empty-cells: hide;border-bottom:hidden;" colspan="1"></th>
@@ -2336,14 +2336,14 @@ gobp_overrep <- imap_dfr(
 g1 <- which(gobp_overrep$GOID %in% gobp_immresp$GOBPID)
 ```
 
-Table 6 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are 3 among them which are directly related to the immune system (particularly to the innate immunity), namely: regulation of natural killer cell mediated immunity, positive regulation of innate immune response, positive regulation of natural killer cell mediated cytotoxicity - they are marked in bold in the table.
+Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are 3 among them which are directly related to the immune system (particularly to the innate immunity), namely: regulation of natural killer cell mediated immunity, positive regulation of innate immune response, positive regulation of natural killer cell mediated cytotoxicity - they are marked in bold in the table.
 
 
 ```r
 gobp_overrep %>%
   kable(align = "lcll",
         col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
-        caption = "<b>Table 6. Overrepresented BPs, by time</b>") %>%
+        caption = "<b>Table 5. Overrepresented BPs, by time</b>") %>%
   kableExtra::row_spec(c(0, g1), bold = TRUE) %>%
   kableExtra::column_spec(1:4, extra_css = "vertical-align:top;") %>%
   kableExtra::kable_classic(full_width = FALSE, position = "left", font_size = 14,
@@ -2351,7 +2351,7 @@ gobp_overrep %>%
 ```
 
 <table class=" lightable-classic" style='font-size: 14px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6. Overrepresented BPs, by time</b></caption>
+<caption style="font-size: initial !important;"><b>Table 5. Overrepresented BPs, by time</b></caption>
  <thead>
   <tr>
    <th style="text-align:left;font-weight: bold;"> Time </th>
@@ -2588,7 +2588,7 @@ gobp_overrep %>%
 
 <br>
 
-## **Список литературы**
+## **References**
 
 <br>
 

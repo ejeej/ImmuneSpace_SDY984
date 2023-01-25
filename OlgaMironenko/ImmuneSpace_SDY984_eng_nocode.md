@@ -9,7 +9,7 @@ Author: Olga Mironenko
 
 <br>
 
-This study project deals with the data on the gene expression among volunteers before and after vaccination with the **live attenuated shingles vaccine Zostavax**. Data were obtained within the study [SDY984](https://www.immport.org/shared/study/SDY984) realized under the program of the [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) and are available at [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (can be downloaded after registration). Results of the original study made on the full data set were published in [@li_metabolic_2017].
+This study project deals with the data on the gene expression among volunteers before and after vaccination with the **live attenuated shingles vaccine Zostavax**. Data were obtained within the study [SDY984](https://www.immport.org/shared/study/SDY984) realized under the program of the [Human Immunology Project Consortium (HIPC)](https://www.immunespace.org/) and are available at [HIPC-II Immune Signatures Data Resource and Analysis (IS2)](https://datatools.immunespace.org/project/home/Integrative_Public_Study/begin.view?SDY=IS2) (can be downloaded after registration). Results of the original study made on the full data set were published in (Li et al. 2017).
 
 **The aim of our project** is to find genes with expression significantly related to the strong immune response to Zoster vaccination, as well as those biological processes which are overrepresented by these genes. The first part of this aim can be achieved by two alternative approaches: 
 
@@ -19,19 +19,19 @@ This study project deals with the data on the gene expression among volunteers b
 
 <br>
 
-**Process of the immune response generation** can be described as follows [@pollard_guide_2021]:
+**Process of the immune response generation** can be described as follows (Pollard and Bijker 2021):
 
 <img src="../OlgaMironenko/images/ImmResp_Vacc1.jpg" width="100%" />
 
 <br>
 
-Or as follows [@desmet_nucleic_2012]:
+Or as follows (Desmet and Ishii 2012):
 
 <img src="../OlgaMironenko/images/ImmResp_Vacc2.jpg" width="100%" />
 
 <br>
 
-Vaccine contains patogene-assiciated molecular patterns (PAMPs) or can induce local reaction with releasing damage-assiciated molecular patterns (DAMPs). These patterns are recognized by pattern recognition receptors (PRRs), expressed by the cells of the **innate immune system**: macrophages, mast cells, neutrophils, dendritic cells (DCs). These cells do not reveal which particular infection or another pathogen has infiltrated the organism, but, depending on the certain cell, should destroy or absorb and split them into fragments and/ or signal about them to the cells of adpative immunity. **Adaptive immunity system** will then work to form/ initialize specific, target immune response against this certain pathogen, by antibody production, in particular. 
+Vaccine contains patogene-associated molecular patterns (PAMPs) or can induce local reaction with releasing damage-associated molecular patterns (DAMPs). These patterns are recognized by pattern recognition receptors (PRRs), expressed by the cells of the **innate immune system**: macrophages, mast cells, neutrophils, dendritic cells (DCs). These cells do not reveal which particular infection or another pathogen has infiltrated the organism, but, depending on the certain cell, should destroy or absorb and split them into fragments and/ or signal about them to the cells of adpative immunity. **Adaptive immunity system** will then work to form/ initialize specific, target immune response against this certain pathogen, by antibody production, in particular. 
 
 In addition, PAMPs and DAMPs can be detected by lymphoid cells of the innate immunity (e.g., NK cells), which induce the release of cytokines, that may cooperate in the activation and orientation of the dendritic cells (DCs). DCs plays the crucial role in transferring the signal from the innate to the adaptive immune system. Activated DCs migrate to lymphoid nodes where they represent fragments of the absorbed antigen to T-cells through special mechanism of co-stimulation of the T-cells receptors (TCR). At this stage one type of T-cells (T-killers, or CD8+ lymphocytes) interact with the type I molecules of the major histocompatibility complex (MHC-I) and, upon recognition of the alien MHC-I, release proteins that dissolve the pathogen, while another type of T-cells (T-helpers, or CD4+ lymphocytes) interact with the type II molecules of the MHC (MHC-II) and, upon recognition of the alien MHC-II, produce cytokines and chemokines. Depending on the cytokines mileau, CD4+ lymphocites can differentiate into different subtypes of T-helpers (Th) and T-follicular helpers (Tfh) - the latter activates B-cells which differentiate into plasma cells that produce antigen-specific antibodies. B-cells and CD8+ lymphocytes can differentiate into memory cells, which allow immune system more quickly recognize and response to familiar pathogen.
 
@@ -83,13 +83,13 @@ It is obvious that immune response activates other biological processes, besides
 
 In the chosen study gene expression was assessed for 35 volunteers just before vaccination and in the several points (1, 3, 7 days) after it. 
 
-**Response to vaccination** was evaluated at 30 days after vaccination. All participants were divided into 3 groups by the strength of their response: low, moderate and high responders. There were several alternative criteria (measures) for this division within the whole range of IS2 studies, but for our project we will use just one of the two available approaches - the MFC_p40 measure. MFC is the maximum fold change of the antibody titer after vaccination in comparison with its value before it (maximum - because some vaccines in some of the IS2 studies contained several strains of virus or atibody titer was measured by several tests for them [@fourati_pan-vaccine_2022]). There was just one strain of Zoster in Zostavax vaccine and antibody titer in the SDY984 study was evaluated with just one test (IgG measurement with ELISA (enzyme-linked immunosorbent assay)), therefore in our case MFC is actually just singular fold change of the antibody titer at 30 days after vaccination (precisely, $log_2(FC)$). As for labelling the participants by the strength of their response, thresholds for their division into low, moderate and high responders were chosen as the 40th and 60th percentiles of MFC [@fourati_pan-vaccine_2022], correspondingly (detailed information about that can be found, inter alia, inside the [scripts](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R) which were used by researchers for preprocessing the data for the study we have chosen).
+**Response to vaccination** was evaluated at 30 days after vaccination. All participants were divided into 3 groups by the strength of their response: low, moderate and high responders. There were several alternative criteria (measures) for this division within the whole range of IS2 studies, but for our project we will use just one of the two available approaches - the MFC_p40 measure. MFC is the maximum fold change of the antibody titer after vaccination in comparison with its value before it (maximum - because some vaccines in some of the IS2 studies contained several strains of virus or atibody titer was measured by several tests for them (Fourati et al. 2022)). There was just one strain of Zoster in Zostavax vaccine and antibody titer in the SDY984 study was evaluated with just one test (IgG measurement with ELISA (enzyme-linked immunosorbent assay)), therefore in our case MFC is actually just singular fold change of the antibody titer at 30 days after vaccination (precisely, $log_2(FC)$). As for labelling the participants by the strength of their response, thresholds for their division into low, moderate and high responders were chosen as the 40th and 60th percentiles of MFC (Fourati et al. 2022), correspondingly (detailed information about that can be found, inter alia, inside the [scripts](https://rdrr.io/github/RGLab/ImmuneSignatures2/src/R/immuneResponseCallGeneration.R) which were used by researchers for preprocessing the data for the study we have chosen).
 
 For simplification we **exclude moderate responders** (7 participants) from our analysis.
 
 <br>
 
-The **original study** [@li_metabolic_2017] utilized the broader data set in comparison with the one available to us (with respect to the greater number of volunteers, number of indicators, including those from metabolomics and flow cytometry, as well as number of time points when these variables were measured) and aimed at wider range of tasks with a bit different (in comparison with ours) emphasis, namely the estimate of the correlation between changes in metabolic indicators and changes of genes' and their modules' expression up to 180 days from vaccination. Therefore, the authors succeed in the detailed description of the immune response to Zostavax vaccine, without it dichotomization. In **our research** we set a narrower goal - to reveal those genes that are differentially expressed (DEGs) in participants depending on the strength of their immune response or expression of which is related (positively or negatively) to the probability of the strong response, and to find out those paths which are represented by these genes.
+The **original study** (Li et al. 2017) utilized the broader data set in comparison with the one available to us (with respect to the greater number of volunteers, number of indicators, including those from metabolomics and flow cytometry, as well as number of time points when these variables were measured) and aimed at wider range of tasks with a bit different (in comparison with ours) emphasis, namely the estimate of the correlation between changes in metabolic indicators and changes of genes' and their modules' expression up to 180 days from vaccination. Therefore, the authors succeed in the detailed description of the immune response to Zostavax vaccine, without it dichotomization. In **our research** we set a narrower goal - to reveal those genes that are differentially expressed (DEGs) in participants depending on the strength of their immune response or expression of which is related (positively or negatively) to the probability of the strong response, and to find out those paths which are represented by these genes.
 
 <br>
 
@@ -464,7 +464,7 @@ As an illustration:
 
 <br>
 
-[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) states for interleukin 2 receptor subunit alpha, it codes Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2) which participates in regulating the activity of immune-related leukocytes. Here are biological processes for this genes' products (from Gene Ontology): inflammatory response to antigenic stimulus; regulation of T cell tolerance induction; apoptotic process; activation-induced cell death of T cells; inflammatory response; immune response; cell surface receptor signaling pathway; Notch signaling pathway; interleukin-2-mediated signaling pathway; positive regulation of activated T cell proliferation; negative regulation of T cell proliferation; positive regulation of T cell differentiation; regulation of T cell homeostatic proliferation; negative regulation of inflammatory response. Hereafter all GO annotations for genes and bilogical processes are obtained with the means of the `AnnotationDbi` package for R [@pages_h_carlson_m_falcon_s_li_n_annotationdbi_2022].
+[**IL2RA**](https://en.wikipedia.org/wiki/IL2RA) states for interleukin 2 receptor subunit alpha, it codes Interleukin-2 receptor alpha chain (CD25), [Interleukin-2 (IL-2)](https://en.wikipedia.org/wiki/Interleukin_2) which participates in regulating the activity of immune-related leukocytes. Here are biological processes for this genes' products (from Gene Ontology): inflammatory response to antigenic stimulus; regulation of T cell tolerance induction; apoptotic process; activation-induced cell death of T cells; inflammatory response; immune response; cell surface receptor signaling pathway; Notch signaling pathway; interleukin-2-mediated signaling pathway; positive regulation of activated T cell proliferation; negative regulation of T cell proliferation; positive regulation of T cell differentiation; regulation of T cell homeostatic proliferation; negative regulation of inflammatory response. Hereafter all GO annotations for genes and bilogical processes are obtained with the means of the `AnnotationDbi` package for R (Pagès H, Carlson M, Falcon S, Li N 2022).
 
 [**RIC3**](https://en.wikipedia.org/wiki/RIC3) states for RIC3 acetylcholine receptor chaperone, it codes chaperon protein RIC-3, which is responsible for resistance to cholinesterase 3 inhibitors. [Chaperon proteins](https://en.wikipedia.org/wiki/Chaperone_(protein)) participate in folding and unfolding of the large proteins or macromolecular protein complexes. Here are biological processes for this genes' products (from Gene Ontology): protein folding; positive regulation of cytosolic calcium ion concentration; synaptic transmission, cholinergic; protein localization to cell surface; cellular protein-containing complex assembly; positive regulation of protein localization to cell surface.
 
@@ -504,7 +504,7 @@ This model allows to estimate whether the response effect changes significantly 
 
 <br>
 
-Linear mixed models will be estimated with the `lmer` function out of the `lme4` package [@bates_fitting_2015] for R (version 4.1.1), average marginal effects will be estimated with the means of the `marginaleffects` function out of the package with the same name [@arel-bundock_marginaleffects_2023]. It can be noted that if we give particular time points to the latter function after the mixed model with the interaction term (e.g., $time=$ 0,1,3,7), then near the $response$ variable we will get the desired values for the ATE of the high response at these points ($\beta_2 + \beta_3*time$) with the corresponding p-values. If to not pass the time points into this function, near the $response$ variable we will get the estimate for the ATE of the high response from the model without the interaction term.
+Linear mixed models will be estimated with the `lmer` function out of the `lme4` package (Bates et al. 2015) for R (version 4.1.1), average marginal effects will be estimated with the means of the `marginaleffects` function out of the package with the same name (Arel-Bundock 2023). It can be noted that if we give particular time points to the latter function after the mixed model with the interaction term (e.g., $time=$ 0,1,3,7), then near the $response$ variable we will get the desired values for the ATE of the high response at these points ($\beta_2 + \beta_3*time$) with the corresponding p-values. If to not pass the time points into this function, near the $response$ variable we will get the estimate for the ATE of the high response from the model without the interaction term.
 
 <br>
 
@@ -656,20 +656,20 @@ Figure 12 contains volcano plot matching the effect size ($log_{10}$ of the OR o
 
 <br>
 
-We have already used Gene Ontology (GO) to obtain annotations for biological processes (BPs) into which products of the differentially expressed genes are involved. However, there can be many findings (i.e.many DEGs), and it is both inconvenient and incorrect to look for annotations for each of them, because products of the same gene can participate in different paths, as well as products from different genes can be involved into the same process. Approaches from the **singular enrichment analysis (SEA)** [@tipney_introduction_2010] allows to determine which particular processes are overrepresented by the genes in some set in comparison with the full gene set (the latter comrises 5 thousand genes in our case). 
+We have already used Gene Ontology (GO) to obtain annotations for biological processes (BPs) into which products of the differentially expressed genes are involved. However, there can be many findings (i.e.many DEGs), and it is both inconvenient and incorrect to look for annotations for each of them, because products of the same gene can participate in different paths, as well as products from different genes can be involved into the same process. Approaches from the **singular enrichment analysis (SEA)** (Tipney and Hunter 2010) allows to determine which particular processes are overrepresented by the genes in some set in comparison with the full gene set (the latter comrises 5 thousand genes in our case). 
 
-In our research we will try to reveal such overrepresented BPs using **p-values from the hypergeometric distribution**, i.e. probabilities of getting the same or even more representation of the given BP in the set of $n$ genes in comparison with the full set of $N$ genes [@boyle_gotermfinder_open_2004]. These p-values can be calculated with the `hyperGtest` function from the `Category` package in R [@gentleman_r_category_2022]. We will set the option `conditional` to TRUE in it. According to the package vignette, in this case "`hyperGTest` function uses the structure of the GO graph to estimate for each term whether or not there is evidence beyond that which is provided by the term's children to call the term in question statistically overrepresented. The algorithm conditions on all child terms that are themselves significant at the specified p-value, odds ratio, minimum or maximum gene set size cutoff. Given a subgraph of the GO ontology, the terms with no child categories are tested first. Next the nodes whose children have already been tested are tested. If any of a given node's children tested significant, the appropriate conditioning is performed)" [@@falcon_using_2007]. 
+In our research we will try to reveal such overrepresented BPs using **p-values from the hypergeometric distribution**, i.e. probabilities of getting the same or even more representation of the given BP in the set of $n$ genes in comparison with the full set of $N$ genes (Boyle et al. 2004). These p-values can be calculated with the `hyperGtest` function from the `Category` package in R (Gentleman R 2022). We will set the option `conditional` to TRUE in it. According to the package vignette, in this case "`hyperGTest` function uses the structure of the GO graph to estimate for each term whether or not there is evidence beyond that which is provided by the term's children to call the term in question statistically overrepresented. The algorithm conditions on all child terms that are themselves significant at the specified p-value, odds ratio, minimum or maximum gene set size cutoff. Given a subgraph of the GO ontology, the terms with no child categories are tested first. Next the nodes whose children have already been tested are tested. If any of a given node's children tested significant, the appropriate conditioning is performed)" (Falcon and Gentleman 2007). 
 
-We use 0.05 as a p-value cut-off and set minimum and maximum number of genes in BPs in the gene universe to 10 and 500, correspondingly. After estimating the hypergepmetric test we will exclude BPs with less than 5 genes from the chosen gene set.
+We use 0.05 as a p-value cut-off and set minimum and maximum number of genes in BPs in the gene universe to 10 and 500, correspondingly. After estimating the hypergeometric test we will exclude BPs with less than 5 genes from the chosen gene set.
 
-We will use two approaches to **control FDR** here: p-value adjustment under Benjamini & Hochberg method and q-values estimations [@storey_statistical_2003].
+We will use two approaches to **control FDR** here: p-value adjustment under Benjamini & Hochberg method and q-values estimations (Storey and Tibshirani 2003).
 
 SEA will be held separately for each set of significant genes, revealed after linear mixed models and logistic regressions.
 
 **The number of the overrepresented BPs** obtained in every model with different cut-offs for the adjusted p-values and q-values is listed in Table 4 (empty cells state for zero BPs).
 
 <table class=" lightable-classic" style='font-size: 14px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 5. Number of significant biological processes (GO) found in hypergeometric tests</b></caption>
+<caption style="font-size: initial !important;"><b>Table 4. Number of significant biological processes (GO) found in hypergeometric tests</b></caption>
  <thead>
 <tr>
 <th style="empty-cells: hide;border-bottom:hidden;" colspan="1"></th>
@@ -936,10 +936,10 @@ SEA will be held separately for each set of significant genes, revealed after li
 
 Mostly all overrepresented biological processes are found for the Baseline and 1-day post-vaccination.
 
-Table 6 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are 3 among them which are directly related to the immune system (particularly to the innate immunity), namely: regulation of natural killer cell mediated immunity, positive regulation of innate immune response, positive regulation of natural killer cell mediated cytotoxicity - they are marked in bold in the table.
+Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are 3 among them which are directly related to the immune system (particularly to the innate immunity), namely: regulation of natural killer cell mediated immunity, positive regulation of innate immune response, positive regulation of natural killer cell mediated cytotoxicity - they are marked in bold in the table.
 
 <table class=" lightable-classic" style='font-size: 14px; font-family: "Source Sans Pro", helvetica, sans-serif; width: auto !important; '>
-<caption style="font-size: initial !important;"><b>Table 6. Overrepresented BPs, by time</b></caption>
+<caption style="font-size: initial !important;"><b>Table 5. Overrepresented BPs, by time</b></caption>
  <thead>
   <tr>
    <th style="text-align:left;font-weight: bold;"> Time </th>
@@ -1176,7 +1176,7 @@ Table 6 contains all **BPs with q-value < 0.05**, grouped by time points when th
 
 <br>
 
-## **Список литературы**
+## **References**
 
 <br>
 
