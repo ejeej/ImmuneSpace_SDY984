@@ -979,7 +979,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> 1 d. </td>
    <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0002715 </td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> regulation of natural killer cell mediated immunity </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that modulates the frequency, rate, or extent of natural killer cell mediated immunity. </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> **Any process that modulates the frequency, rate, or extent of natural killer cell mediated immunity.** </td>
   </tr>
   <tr>
    <td style="text-align:left;vertical-align:top;"> 1 d. </td>
