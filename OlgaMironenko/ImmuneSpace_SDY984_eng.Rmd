@@ -1640,21 +1640,23 @@ gobp_overrep <- imap_dfr(
   ~ .x %>% filter(qvalue < 0.05) %>% 
     transmute(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]], 
               GOID, TERM, DEFINITION, Count, up, down, genes)) %>%
-  mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]")) %>%
-  transmute(time, GOID, TERM, DEFINITION) %>%
+  mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]"),
+         imm = as.numeric(GOID %in% gobp_immresp$GOBPID)) %>%
+  select(time, GOID, TERM, DEFINITION, imm) %>%
   unique() %>%
-  group_by(GOID, TERM, DEFINITION) %>%
+  group_by(GOID, TERM, DEFINITION, imm) %>%
   summarise(time = paste(time, collapse = ", ")) %>%
   dplyr::select(time, everything()) %>%
-  arrange(time, GOID)
+  arrange(-imm, time, GOID)
 
-g1 <- which(gobp_overrep$GOID %in% gobp_immresp$GOBPID)
+g1 <- which(gobp_overrep$imm == 1)
 ```
 
 Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are `r length(g1)` among them which are directly related to the immune system (particularly to the innate immunity), namely: `r paste(gobp_overrep$TERM[g1], collapse = ", ")` - they are marked in bold in the table.
 
 ```{r tab5_hypergres2}
 gobp_overrep %>%
+  select(-imm) %>%
   kable(align = "lcll",
         col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
         caption = "<b>Table 5. Overrepresented BPs, by time</b>") %>%

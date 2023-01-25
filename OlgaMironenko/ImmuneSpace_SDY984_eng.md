@@ -2325,15 +2325,16 @@ gobp_overrep <- imap_dfr(
   ~ .x %>% filter(qvalue < 0.05) %>% 
     transmute(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]], 
               GOID, TERM, DEFINITION, Count, up, down, genes)) %>%
-  mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]")) %>%
-  transmute(time, GOID, TERM, DEFINITION) %>%
+  mutate(time = str_remove_all(str_extract(model, "\\(.+\\)"), "[\\(\\)]"),
+         imm = as.numeric(GOID %in% gobp_immresp$GOBPID)) %>%
+  select(time, GOID, TERM, DEFINITION, imm) %>%
   unique() %>%
-  group_by(GOID, TERM, DEFINITION) %>%
+  group_by(GOID, TERM, DEFINITION, imm) %>%
   summarise(time = paste(time, collapse = ", ")) %>%
   dplyr::select(time, everything()) %>%
-  arrange(time, GOID)
+  arrange(-imm, time, GOID)
 
-g1 <- which(gobp_overrep$GOID %in% gobp_immresp$GOBPID)
+g1 <- which(gobp_overrep$imm == 1)
 ```
 
 Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when they were overrepresented at least in one model. There are 3 among them which are directly related to the immune system (particularly to the innate immunity), namely: regulation of natural killer cell mediated immunity, positive regulation of innate immune response, positive regulation of natural killer cell mediated cytotoxicity - they are marked in bold in the table.
@@ -2341,6 +2342,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
 
 ```r
 gobp_overrep %>%
+  select(-imm) %>%
   kable(align = "lcll",
         col.names = c("Time", "GOBPID", "BP (GO term)", "Definition (GO)"),
         caption = "<b>Table 5. Overrepresented BPs, by time</b>") %>%
@@ -2366,6 +2368,18 @@ gobp_overrep %>%
    <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0002715 </td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> regulation of natural killer cell mediated immunity </td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that modulates the frequency, rate, or extent of natural killer cell mediated immunity. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0045089 </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> positive regulation of innate immune response </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection. </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> 1 d. </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0045954 </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> positive regulation of natural killer cell mediated cytotoxicity </td>
+   <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of natural killer cell mediated cytotoxicity. </td>
   </tr>
   <tr>
    <td style="text-align:left;vertical-align:top;"> 1 d. </td>
@@ -2420,18 +2434,6 @@ gobp_overrep %>%
    <td style="text-align:center;vertical-align:top;"> GO:0043393 </td>
    <td style="text-align:left;vertical-align:top;"> regulation of protein binding </td>
    <td style="text-align:left;vertical-align:top;"> Any process that modulates the frequency, rate or extent of protein binding. </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> 1 d. </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0045089 </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> positive regulation of innate immune response </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection. </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> 1 d. </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> GO:0045954 </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> positive regulation of natural killer cell mediated cytotoxicity </td>
-   <td style="text-align:left;font-weight: bold;vertical-align:top;"> Any process that activates or increases the frequency, rate or extent of natural killer cell mediated cytotoxicity. </td>
   </tr>
   <tr>
    <td style="text-align:left;vertical-align:top;"> 1 d. </td>
