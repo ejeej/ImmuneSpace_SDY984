@@ -2,7 +2,7 @@
 title: '**Identification of genes associated with immune response using open database ImmuneSpace**'
 subtitle: '**Study SDY984 (immune response after varicella zoster vaccine)**'
 author: "Olga Mironenko"
-date: "2023-01-25"
+date: "2023-01-26"
 output:
   html_document:
     code_folding: hide
@@ -1071,6 +1071,8 @@ genes_sig <- map(
     split(f = as.factor(.$model_var)),
   ~ .x %>% pull(gene))
 
+genes_sig <- genes_sig[!grepl("noint", names(genes_sig))]
+
 models <- names(genes_sig)
 models_num <- as.numeric(str_extract(models, "\\d+"))
 
@@ -1314,8 +1316,6 @@ upset_plot(upset_plt_df_2, rev(colnames(upset_plt_df_2)),
 
 ![](ImmuneSpace_SDY984_eng_files/figure-html/fig6_upset_ame-2.png)<!-- -->
 
-The noticeably small number of genes have the significant ATE over the whole range of time points when expression was assessed (0-7 days). There were also quite few genes with insignificant baseline ATE of response and significant ATE from 1 to 7 days, as well genes with significant ATE at the Baseline and insignificant subsequent ATEs. On the contrast, there are two modes: **genes for which the ATE became significant only at 7 days after vaccination and genes for which the ATE turned from significant at 0-3 days to insignificant at 7 days**.
-
 
 ```r
 # Genes with insignificant ATE at 7d., but significant at 0-3 d.
@@ -1329,6 +1329,8 @@ genes_sig_ame7 <- genes_maxvar %>%
            !init_int_ame0 & !init_int_ame1 & !init_int_ame3 &
            !rank_int_ame0 & !rank_int_ame1 & !rank_int_ame3)
 ```
+
+The noticeably small number of genes have the significant ATE over the whole range of time points when expression was assessed (0-7 days). There were also quite few genes with insignificant baseline ATE of response and significant ATE from 1 to 7 days, as well genes with significant ATE at the Baseline and insignificant subsequent ATEs. On the contrast, there are two modes: **genes for which the ATE became significant only at 7 days after vaccination (310) and genes for which the ATE turned from significant at 0-3 days to insignificant at 7 days (216)**.
 
 After combining the results for the specifications with the initial data on expression and ranks of genes by expression we obtain 310 genes with significant 7-day ATE (in any specification) and insignificant 0-1-3-day ATEs (in both specifications), as well as 216 genes with significant 0-1-3-day ATEs (in any specification) and insignificant 7-day ATE (in both specifications). The most represented by these two gene sets **biological processes** are shown in Figures 7 (1) and 7(2).
 
@@ -1457,7 +1459,7 @@ ggplot(lmer_v_int_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = "ATE for response at the time point", y = bquote(-log[10](p[ATE])), 
-       title = "Figure 8. P-value vs. effect size for response",
+       title = "Figure 8. P-value vs. size of ATE for response",
        subtitle = "Average marginal effects after linear mixed models with the interaction term",
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -1909,7 +1911,7 @@ ggplot(logreg_v_plt, aes(x = estimate, y = logp)) +
   scale_color_manual(values = c("#86BCB6", "#F28E2B")) +
   facet_rep_grid(time ~ expr, repeat.tick.labels = TRUE, scales = "free", switch = "y") +
   labs(x = bquote(log[10](OR)), y = bquote(-log[10](p[OR])), 
-       title = "Figure 13. P-value vs. size of gene expression's effect on response",
+       title = "Figure 13. P-value vs. size of expression's OR of response",
        subtitle = bquote(log[10]~"odds ratios after logistic regressions for the (strong) response"),
        caption = "Solid red line is for p = 0.05, dashed red line is for p = 0.1.\nThe higher the Y axis value, the lower is the p-value.") +
   theme_classic(base_size = 12) +
@@ -2030,7 +2032,7 @@ saveRDS(hg_res_pq, "OlgaMironenko/res/hg_res_pq.rds")
 hg_res_pq <- readRDS(file.path("..", "OlgaMironenko", "res", "hg_res_pq.rds"))
 
 imap_dfr(
-  hg_res_pq, 
+  hg_res_pq[!grepl("noint", names(hg_res_pq))], 
   ~ tibble(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]],
            p01 = sum(.x$p.adjust < 0.1),
            p005 = sum(.x$p.adjust < 0.05),
@@ -2138,17 +2140,6 @@ imap_dfr(
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig. b2 (Overall) </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
    <td style="text-align:left;"> Ranks, sig. ATE (Baseline) </td>
    <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> 2 </td>
@@ -2205,17 +2196,6 @@ imap_dfr(
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. b3 (Change) </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Ranks, sig. b2 (Overall) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -2321,7 +2301,7 @@ Mostly all overrepresented biological processes are found for the Baseline and 1
 
 ```r
 gobp_overrep <- imap_dfr(
-  hg_res_pq,
+  hg_res_pq[!grepl("noint", names(hg_res_pq))],
   ~ .x %>% filter(qvalue < 0.05) %>% 
     transmute(model = c(genes_sig_lbls, genes_sig_logreg_lbls)[[.y]], 
               GOID, TERM, DEFINITION, Count, up, down, genes)) %>%

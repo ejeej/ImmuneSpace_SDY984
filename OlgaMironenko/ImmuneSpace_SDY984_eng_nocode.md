@@ -756,17 +756,6 @@ SEA will be held separately for each set of significant genes, revealed after li
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig. b2 (Overall) </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
    <td style="text-align:left;"> Ranks, sig. ATE (Baseline) </td>
    <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> 2 </td>
@@ -823,17 +812,6 @@ SEA will be held separately for each set of significant genes, revealed after li
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. b3 (Change) </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Ranks, sig. b2 (Overall) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -957,7 +935,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
   </tr>
   <tr>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089</b> </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089 </b></td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of innate immune response</b> </td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection.</b> </td>
   </tr>
@@ -1173,7 +1151,6 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
   </tr>
 </tbody>
 </table>
-<br>
 
 ## **References**
 
