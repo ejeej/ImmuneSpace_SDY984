@@ -624,7 +624,7 @@ After combining the results for the specifications with the initial data on expr
 
 At the next step in the analysis of the results obtained from the linear mixed models we can **match the statistical significance of the average response effect to its size**. 
 
-Figure 8 contains the volcano plots for the ATEs at particular time points (on the X axis) and $-log_{10}$-transformed p-values for them (on the Y axis). Points for 5 genes with the largest negative and largest positive significant ATEs are highlighted at every point.
+Figure 8 contains the volcano plots for the ATEs at particular time points (on the X axis) and _-log<sub>10</sub>_-transformed p-values for them (on the Y axis). Points for 5 genes with the largest negative and largest positive significant ATEs are highlighted at every point.
 
 The same plots are drawn for **the average response effect at particular time points** estimated after linear mixed models with the response-time interaction (Figure 9).
 
@@ -682,7 +682,7 @@ We see that the gene sets are much more intersected at day 7, than before vaccin
 
 We can estimate the size of the effect of the gene expression at the particular point of time on the probability of high response using **odds rations**, OR (exponentiated coefficients from the logistic regression). 
 
-Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of the OR on the X asis) with its statistical significance (_log<sub>10</sub>_-transformed p-value on the Y axis). For the purpose of visualiazation in the results for regressions with the initial data on expressions we replaced _log<sub>10</sub>_ values of ORs out of the interval [-10, 10] with the nearest border of this interval, we did the same with the _log<sub>10</sub>_ values of ORs out of the interval [-4, 4] from the results in regressions with ranks of genes by expression. We colored points for 5 genes with the lowest and largest significant ORs in orange.
+Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of the OR on the X asis) with its statistical significance (_-log<sub>10</sub>_-transformed p-value on the Y axis). For the purpose of visualiazation in the results for regressions with the initial data on expressions we replaced _log<sub>10</sub>_ values of ORs out of the interval [-10, 10] with the nearest border of this interval, we did the same with the _log<sub>10</sub>_ values of ORs out of the interval [-4, 4] from the results in regressions with ranks of genes by expression. We colored points for 5 genes with the lowest and largest significant ORs in orange.
 
 ![](OlgaMironenko/ImmuneSpace_SDY984_eng_files/figure-html/fig13_volcano_or-1.png)<!-- -->
 
@@ -782,17 +782,6 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig. b2 (Overall) </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;"> 1 </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
    <td style="text-align:left;"> Ranks, sig. ATE (Baseline) </td>
    <td style="text-align:center;"> 3 </td>
    <td style="text-align:center;"> 2 </td>
@@ -849,17 +838,6 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
   </tr>
   <tr>
    <td style="text-align:left;"> Ranks, sig. b3 (Change) </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-   <td style="text-align:center;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Ranks, sig. b2 (Overall) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -983,7 +961,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
   </tr>
   <tr>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>1 d.</b> </td>
-   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089</b> </td>
+   <td style="text-align:center;font-weight: bold;vertical-align:top;"> <b>GO:0045089 </b></td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>positive regulation of innate immune response</b> </td>
    <td style="text-align:left;font-weight: bold;vertical-align:top;"> <b>Any process that activates or increases the frequency, rate or extent of the innate immune response, the organism's first line of defense against infection.</b> </td>
   </tr>
@@ -1199,7 +1177,32 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
   </tr>
 </tbody>
 </table>
+
 <br>
+
+## **Discussion**
+
+<br>
+
+In this study we analysed transcriptomics data revealed as part of the research conducted by the Human Immunology Project Consortium from patients after vaccination with Zostavax (SDY984 study) using ImmuneSpace database. The aim of the study was to compare the gene expression profiles of patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity. 
+
+We used several alternative approaches to identify genes with expression related to the immune response. 
+
+Comparison of the gene expressions between low and high responders using Mann-Whitney tests with p-values adjustment under Benjamini & Hochberg method discovered 2 genes with statistically significant (at 5% significance level) different expression at 7 days after vaccination: _IL2RA_ and _RIC3_. 
+
+After estimation of the linear mixed models for every gene' expression over individual random intercept, time, response and time-response interaction we got two largest gene sets: one of them consists of 334 genes with the significant main effect for response and its insignificant interaction with time, the other one includes 370 genes with significant interaction and insignificant main term. We can say that the average expression for the former genes was significantly different between high and low responders before vaccination, but its dynamics was similar after vaccination. The latter genes got similar average expression at the baseline for both groups, but differed in its change over time. The most representative biological processes (BPs, annotated using Gene Ontology) for the both of these sets include _inflammatory, innate immunity and adaptive immunity responses_, but only the first of them has genes involved into _neutrophil chemostaxis, chemokine-mediated signalling pathway, regulation of interleukin-8 production and natural killer cell mediated cytoxicity_.
+
+In addition, estimation of the average treatment effects (ATEs) for response after linear mixed models gave us another pair of the largest gene sets with significant ATEs: 310 genes for which the ATE became significant only at 7 days after vaccination and 216 genes for which the ATE turned from significant at 0-3 days to insignificant at 7 days. Again, both of them represented, among others, BPs for _inflammatory, innate immunity and adaptive immunity responses_, and, which is more interesting, genes involved into _hemokine-mediated signalling pathway, regulation of interleukins 6 and 8, cellular response to interleukin-1 or interferon-gamma, B-cell differentiation_ occured only in the latter set (significant before vaccination and 3 days after it), while representatives of _thymus development, regulation of T-cell proliferation or cytokine production, and lymph node development_ occured only in the latter one (had significant ATE only at 7 days).
+
+Genes with the largest significant positive ATE for response (i.e., on average, having higher expression among high responders) included _NEBL, CRIP2, CCR3, LILRA3, TSIX, SLC38A11_, with the largest negative ATE for response (i.e., on average, having lower expression among high responders) - _OLFM4, MMP8, CEACAM8, BNC2, GZMH, USP9Y, KDM5D, RPS4Y1, EIF1AY, DDX3Y_. 
+
+We showed that over time the number of genes with significant ATE of response which were related to the _immune response_ BP increased - mainly owing to genes regulating _inflammatory response_. The number of genes with significant ATEs involved into the _innate immune response_ were higher before vaccination and up to 3 days after it, when, among others, paths for _response to fungus, mucosa and bacterium_ were active (perhaps, immune system tried to identify the type of pathogen). _T-cell costimulation, regulation of cytokine production and reponse to cytokine, regulation of B-cell and T-cell proliferation_ showed up among significant gene sets only at 7 days after vaccination.
+
+Results for logistic regressions for immune response over each gene's expression at each time point demonstrated that gene sets with significant response odds ratio (OR) with respect to 1-point increase in expression are not perfectly intersected with gene sets with significant ATE at the corresponding time point: at 7 days they are intersected by the largest amount of genes, although the set of ATE-significant genes still contains much more unique items than the corresponding set with OR-significant genes.
+
+We can list genes with the largest positive log(OR), i.e. with expression strongly positively related to the probability high immune response: _STX3, IL2RA, RIC3, TREML5P, IRGQ, CROCCP2, SYNGAP1_, and genes with the largest negative log(OR), i.e. i.e. with expression strongly negatively related to the probability high immune response: _CCL5, SNX33, RAP2A_.
+
+Finally, for every set of genes identified as related to the immune response after linear mixed models and logistic regressions, we realized functional (singular enrichment) analysis by estimating p-values from the hypergeometric distribution and discovering overrepresented BPs as ones with q-value < 0.05. There were no BPs overrepresented by gene sets obtained from any model using data on their expressions at 3 or 7 days after vaccination. Totally, we got 37 overrepresented BPs (mostly at 1 day after vaccination), 3 of them are directly related to immunity: _regulation of innate immune response, regulation of natural killer cell mediated immunity, regulation of natural killer cell mediated cytotoxicity_ - all three of them were overrepresented at 1 day post vaccination.
 
 <br>
 
@@ -1207,7 +1210,11 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
 
 <br>
 
+In this study we analysed transcriptomics data obtained under the research by the Human Immunology Project Consortium from patients after vaccination with Zostavax vaccine (SDY984 study) and available from the ImmuneSpace database. The aim of our project was to compare the gene expression profiles between patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
 
+As we got data on gene expression only up to 7 days after vaccination, while immune response to the live attenuated vaccine Zostavax was assessed using ELISA-measured IgG at 30 days, we were able to analyze gene expression profiles only for the very early stage of immune response. We found some signs of activation of the signal paths related to inflammatory response, as well as to innate and adaptive immune response among high responders. 
+
+Thus, at 1 day after vaccination paths for positive regulation of the innate immune response (particularly, natural killer cell mediated immunity) were overrepresented by gene sets with expression significantly related to immune response among study participants. Also at the early stage there were differentially expressed genes involved into processes of response to fungus, mucosa and bacterium, while T-cell costimulation, regulation of cytokine production and reponse to cytokine, regulation of B-cell and T-cell proliferation showed up among significant gene sets only at 7 days after vaccination.
 
 <br>
 
