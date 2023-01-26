@@ -17,7 +17,7 @@ Vaccination leads to the development of the immunity against specific pathogen. 
 
 Varicella zoster is a commonly known virus from the Herpesviridae family, which is capable to cause such diseases as shingles and postherpetic neuralgia. Risk of these diseases increases with the age, so vaccination is highly recommended for people who is older than 60 years. Zostavax is a live attenuated vaccine which is used to treat a latent virus that has remained dormant in cells since chicken pox infection. 
 
-In this study we analysed transcriptomics data revealed as part of the research conducted by the Human Immunology Project Consortium from patients after vaccination with Zostavax using ImmuneSpace database. The aim of the study was to compare the gene expression profiles of patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
+In this study we analysed transcriptomics data from the research conducted by the Human Immunology Project Consortium among volunteers after vaccination with Zostavax vaccine (SDY984 study) using open-source ImmuneSpace database. The aim of our project was to compare the gene expression profiles of patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
 
 <br>
 
@@ -848,7 +848,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig.OR (Baseline) </td>
+   <td style="text-align:left;"> Expr., sig. OR (Baseline) </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
@@ -859,7 +859,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig.OR (1 d.) </td>
+   <td style="text-align:left;"> Expr., sig. OR (1 d.) </td>
    <td style="text-align:center;"> 6 </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -870,7 +870,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig.OR (3 d.) </td>
+   <td style="text-align:left;"> Expr., sig. OR (3 d.) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -881,7 +881,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Expr., sig.OR (7 d.) </td>
+   <td style="text-align:left;"> Expr., sig. OR (7 d.) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -892,7 +892,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Ranks, sig.OR (Baseline) </td>
+   <td style="text-align:left;"> Ranks, sig. OR (Baseline) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -903,7 +903,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Ranks, sig.OR (1 d.) </td>
+   <td style="text-align:left;"> Ranks, sig. OR (1 d.) </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;"> 1 </td>
    <td style="text-align:center;">  </td>
@@ -914,7 +914,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Ranks, sig.OR (3 d.) </td>
+   <td style="text-align:left;"> Ranks, sig. OR (3 d.) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -925,7 +925,7 @@ Figure 12 contains volcano plot matching the effect size (_log<sub>10</sub>_ of 
    <td style="text-align:center;">  </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> Ranks, sig.OR (7 d.) </td>
+   <td style="text-align:left;"> Ranks, sig. OR (7 d.) </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
    <td style="text-align:center;">  </td>
@@ -1184,7 +1184,7 @@ Table 5 contains all **BPs with q-value < 0.05**, grouped by time points when th
 
 <br>
 
-In this study we analysed transcriptomics data revealed as part of the research conducted by the Human Immunology Project Consortium from patients after vaccination with Zostavax (SDY984 study) using ImmuneSpace database. The aim of the study was to compare the gene expression profiles of patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity. 
+We analysed transcriptomics data from the research conducted by the Human Immunology Project Consortium among volunteers after vaccination with the live attenuated vaccine against Varicella zoster (Zostavax). The dataset used for the analysis contained data on 5 thousand genes' expression at 0, 1, 3 and 7 days after vaccination, and indicator for the immune response status according to categorized fold change in antibodies to Zoster from 0 to 30 days (14 high and 14 low responders).
 
 We used several alternative approaches to identify genes with expression related to the immune response. 
 
@@ -1210,11 +1210,11 @@ Finally, for every set of genes identified as related to the immune response aft
 
 <br>
 
-In this study we analysed transcriptomics data obtained under the research by the Human Immunology Project Consortium from patients after vaccination with Zostavax vaccine (SDY984 study) and available from the ImmuneSpace database. The aim of our project was to compare the gene expression profiles between patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
+We analysed transcriptomics data from the research conducted by the Human Immunology Project Consortium among volunteers after vaccination with the live attenuated vaccine against Varicella zoster (Zostavax). The dataset is freely available form the ImmuneSpace database. The aim of our project was to compare the gene expression profiles between patients with high and low levels of post-vaccination immunity and to identify early transcriptional markers that can be used to evaluate the quality of the immunity.
 
-As we got data on gene expression only up to 7 days after vaccination, while immune response to the live attenuated vaccine Zostavax was assessed using ELISA-measured IgG at 30 days, we were able to analyze gene expression profiles only for the very early stage of immune response. We found some signs of activation of the signal paths related to inflammatory response, as well as to innate and adaptive immune response among high responders. 
+As we got data on gene expression only up to 7 days after vaccination, while immune response to vaccine was assessed using ELISA-measured IgG for Zoster antigen at 30 days, we were able to analyze gene expression profiles only for the very early stage of the immune response. We found some signs of activation in the signal paths related to inflammatory response, as well as to innate and adaptive immune response among high responders. 
 
-Thus, at 1 day after vaccination paths for positive regulation of the innate immune response (particularly, natural killer cell mediated immunity) were overrepresented by gene sets with expression significantly related to immune response among study participants. Also at the early stage there were differentially expressed genes involved into processes of response to fungus, mucosa and bacterium, while T-cell costimulation, regulation of cytokine production and reponse to cytokine, regulation of B-cell and T-cell proliferation showed up among significant gene sets only at 7 days after vaccination.
+Thus, at 1 day after vaccination paths for positive regulation of the innate immune response (particularly, for the natural killer cell mediated immunity) were overrepresented by gene sets with expression significantly related to the strength of immune response in study participants. In addition, at the early stage there were differentially expressed genes involved into processes of response to fungus, mucosa and bacterium, while T-cell costimulation, regulation of cytokine production and reponse to cytokine, regulation of B-cell and T-cell proliferation showed up among significant gene sets only at 7 days after vaccination.
 
 <br>
 
