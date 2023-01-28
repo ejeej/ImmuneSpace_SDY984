@@ -1,7 +1,7 @@
 # **Identification of genes associated with immune response using open database ImmuneSpace**
 ### **Study SDY984 (immune response after varicella zoster vaccine)**
 
-Authors: Olga Ilina, Olga Mironenko, Shakir Suleymanov
+Authors: Olga Mironenko, Shakir Suleymanov
 
 Bioinformatics Institute, Biostatistics and Analisys of Medical Data, Final project
 
